@@ -1,5 +1,5 @@
 {
-  "name": "c&o-coffee-collective-ordering",
+  "name": "cno-coffee-collective-ordering",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@square/web-sdk": "^2.1.0",
-    "@supabase/supabase-js": "^2.45.7",
+    "@supabase/supabase-js": "^2.58.0",
     "buffer": "^6.0.3",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",

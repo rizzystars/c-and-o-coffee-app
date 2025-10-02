@@ -1,8 +1,8 @@
 functionsDirectory = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\netlify\\functions"
 functionsDirectoryOrigin = "config-v1"
+redirectsOrigin = "config"
 plugins = []
 headers = []
-redirects = []
 
 [build]
 publish = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\dist"
@@ -30,3 +30,15 @@ functions = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUT
 [functions."*"]
 external_node_modules = ["@supabase/supabase-js"]
 node_bundler = "esbuild"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
