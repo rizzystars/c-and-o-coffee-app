@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { create } from 'zustand';
 
@@ -80,12 +80,6 @@ export default function CheckoutPage() {
 
   const total = subtotal + taxAmount + tipAmount - discountAmount;
 
-  useEffect(() => {
-    if (cart.length === 0) {
-      navigate("/menu");
-    }
-  }, [cart, navigate]);
-
   const handlePaymentSuccess = async (orderId: string) => {
     // Pass order details to confirmation page
     navigate("/confirmation", {
@@ -124,6 +118,22 @@ export default function CheckoutPage() {
     }
   };
 
+  // Standard UX: if cart is empty, show an "Empty cart" page with CTA to Menu
+  if (cart.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <h2 className="text-2xl font-bold mb-3">Your cart is empty</h2>
+        <p className="text-gray-600 mb-6">Add some items before checking out.</p>
+        <button
+          onClick={() => navigate("/menu")}
+          className="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-900 transition-colors"
+          aria-label="Go to menu to add items"
+        >
+          Go to Menu
+        </button>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -178,7 +188,6 @@ export default function CheckoutPage() {
             </div>
             {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
           </div>
-
 
           <div className="border-t border-gray-200 pt-6 space-y-3">
             <div className="flex justify-between text-gray-600">
@@ -270,4 +279,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
