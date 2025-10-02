@@ -1,70 +1,63 @@
-// netlify/functions/coupon-validate.ts
-import type { Handler } from "@netlify/functions";
+import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Example: 2oz Espresso reward key → $2 discount
-// You can extend this map as you add new reward types.
-const REWARD_DISCOUNTS: Record<string, { amountCents: number; label: string }> = {
-  ESPRESSO_2OZ: { amountCents: 200, label: "Free 2oz Espresso Shot" },
-};
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
-
   try {
-    const { code } = JSON.parse(event.body || "{}") as { code?: string };
-    if (!code) {
-      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "Missing code" }) };
+    if (event.httpMethod !== "POST") {
+      return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false },
-    });
+    const { code, email } = JSON.parse(event.body || "{}");
+    if (!code) {
+      return { statusCode: 400, body: JSON.stringify({ valid: false, error: "Missing code" }) };
+    }
 
-    // Look for this code in pending_rewards
+    // Look up coupon in Supabase
     const { data, error } = await supabase
       .from("pending_rewards")
-      .select("id, reward_type, status, expires_at")
+      .select("*")
       .eq("code", code)
       .maybeSingle();
 
-    if (error) throw error;
-
-    if (!data) {
-      return { statusCode: 404, body: JSON.stringify({ ok: false, error: "Code not found" }) };
+    if (error || !data) {
+      return { statusCode: 200, body: JSON.stringify({ valid: false, error: "Not found" }) };
     }
 
+    // Check expiration or status
     if (data.status !== "PENDING") {
-      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "Code already used" }) };
+      return { statusCode: 200, body: JSON.stringify({ valid: false, error: "Already used" }) };
     }
 
-    if (new Date(data.expires_at) < new Date()) {
-      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "Code expired" }) };
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      return { statusCode: 200, body: JSON.stringify({ valid: false, error: "Expired" }) };
     }
 
-    const rewardMeta = REWARD_DISCOUNTS[data.reward_type];
-    if (!rewardMeta) {
-      return { statusCode: 400, body: JSON.stringify({ ok: false, error: "Unsupported reward type" }) };
+    // Map reward type → discount amount
+    let discountCents = 0;
+    let label = "Reward";
+
+    if (data.reward_type === "ESPRESSO_2OZ") {
+      discountCents = 200;
+      label = "Free 2oz Espresso";
+    } else if (data.reward_type === "AMERICANO") {
+      discountCents = 150;
+      label = "Free Americano";
     }
 
-    // ✅ Success: return discount info
     return {
       statusCode: 200,
       body: JSON.stringify({
-        ok: true,
+        valid: true,
         code,
-        rewardType: data.reward_type,
-        discountCents: rewardMeta.amountCents,
-        label: rewardMeta.label,
+        label,
+        discount: { amountCents: discountCents }
       }),
     };
-  } catch (e: any) {
-    console.error("coupon-validate error:", e);
-    return { statusCode: 500, body: JSON.stringify({ ok: false, error: e?.message || "Server error" }) };
+  } catch (err: any) {
+    return { statusCode: 500, body: JSON.stringify({ valid: false, error: err.message }) };
   }
 };
