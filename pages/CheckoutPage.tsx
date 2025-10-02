@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { create } from "zustand";
 
@@ -6,21 +6,18 @@ import { create } from "zustand";
 // To make this component runnable, dependencies are temporarily included here.
 // In your project, these would be imported from their actual files.
 
-// 1) Mock useCartStore from ../hooks/useCartStore  (SEEDED CART)
+// 1) Mock useCartStore (EMPTY cart by default)
 const useCartStore = create((set) => ({
-  cart: [
-    { id: "1", menuItem: { name: "Cold Brew Regular", price: 5.75 }, quantity: 1 },
-    { id: "2", menuItem: { name: "Espresso Regular", price: 2.0 }, quantity: 1 },
-  ],
+  cart: [],
   clearCart: () => set({ cart: [] }),
 }));
 
-// 2) Mock useAuthStore from ../hooks/useAuthStore
+// 2) Mock useAuthStore
 const useAuthStore = create((set) => ({
-  user: { id: "test-user", email: "test@example.com" }, // Assume user is logged in for testing
+  user: { id: "test-user", email: "test@example.com" },
 }));
 
-// 3) Mock SquarePaymentForm from ../components/SquarePaymentForm
+// 3) Mock SquarePaymentForm
 const SquarePaymentForm = ({
   amount,
   onPaymentSuccess,
@@ -59,7 +56,7 @@ const SquarePaymentForm = ({
   );
 };
 
-// 4) Mock constants from ../constants
+// 4) Mock constants
 const VITE_TAX_PERCENT = 6;
 
 // --- FINAL CHECKOUT PAGE COMPONENT ---
@@ -80,21 +77,13 @@ export default function CheckoutPage() {
   const tipAmount = subtotal * (tipPercentage / 100);
 
   let discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
-  // Ensure discount doesn't make total negative
   if (subtotal + taxAmount + tipAmount - discountAmount < 0) {
     discountAmount = subtotal + taxAmount + tipAmount;
   }
 
   const total = subtotal + taxAmount + tipAmount - discountAmount;
 
-  useEffect(() => {
-    if (cart.length === 0) {
-      navigate("/menu");
-    }
-  }, [cart, navigate]);
-
   const handlePaymentSuccess = async (orderId: string) => {
-    // Pass order details to confirmation page
     navigate("/confirmation", {
       state: {
         orderId,
@@ -114,10 +103,12 @@ export default function CheckoutPage() {
       return;
     }
     try {
-      const isEspressoInCart = cart.some((item) => item.menuItem.name.toLowerCase().includes("espresso"));
+      const isEspressoInCart = cart.some((item) =>
+        item.menuItem.name.toLowerCase().includes("espresso")
+      );
 
       if (isEspressoInCart) {
-        setAppliedDiscount({ code: couponCode, amount: 2.0 }); // Assuming espresso is $2.00
+        setAppliedDiscount({ code: couponCode, amount: 2.0 });
         setCouponCode("");
       } else {
         setCouponError("This code requires an Espresso Shot in your cart.");
@@ -138,6 +129,22 @@ export default function CheckoutPage() {
           className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
         >
           Go to Sign In
+        </button>
+      </div>
+    );
+  }
+
+  // 🔹 Empty cart message instead of redirect
+  if (cart.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <h2 className="text-2xl font-bold mb-3">Your cart is empty</h2>
+        <p className="text-gray-600 mb-6">Add some items before checking out.</p>
+        <button
+          onClick={() => navigate("/menu")}
+          className="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-900 transition-colors"
+        >
+          Go to Menu
         </button>
       </div>
     );
