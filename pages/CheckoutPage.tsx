@@ -1,69 +1,20 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { create } from "zustand";
 
-// --- STUBBED DEPENDENCIES ---
-// To make this component runnable, dependencies are temporarily included here.
-// In your project, these would be imported from their actual files.
+import { useCartStore } from "../hooks/useCartStore";
+import { useAuthStore } from "../hooks/useAuthStore";
+import SquarePaymentForm from "../components/SquarePaymentForm";
 
-// 1) Mock useCartStore (EMPTY cart by default)
-const useCartStore = create((set) => ({
-  cart: [],
-  clearCart: () => set({ cart: [] }),
-}));
+// Tax from Vite env; default to 6 if not present
+const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
 
-// 2) Mock useAuthStore
-const useAuthStore = create((set) => ({
-  user: { id: "test-user", email: "test@example.com" },
-}));
-
-// 3) Mock SquarePaymentForm
-const SquarePaymentForm = ({
-  amount,
-  onPaymentSuccess,
-  cartItems,
-  tipCents,
-  couponCode,
-}: {
-  amount: number;
-  onPaymentSuccess: (orderId: string) => void;
-  cartItems: any[];
-  tipCents: number;
-  couponCode?: string;
-}) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleMockPayment = () => {
-    setIsProcessing(true);
-    console.log("Mock Payment Details:", { amount, cartItems, tipCents, couponCode });
-    setTimeout(() => {
-      onPaymentSuccess(`MOCK_ORDER_${Date.now()}`);
-      setIsProcessing(false);
-    }, 1500);
-  };
-
-  return (
-    <div className="text-center p-4 border rounded-lg bg-gray-50">
-      <p className="font-semibold text-gray-700">Payment Form Placeholder</p>
-      <button
-        onClick={handleMockPayment}
-        disabled={isProcessing}
-        className="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400"
-      >
-        {isProcessing ? "Processing..." : `Pay $${amount.toFixed(2)}`}
-      </button>
-    </div>
-  );
-};
-
-// 4) Mock constants
-const VITE_TAX_PERCENT = 6;
-
-// --- FINAL CHECKOUT PAGE COMPONENT ---
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { cart, clearCart } = useCartStore();
+  const { cart: rawCart = [], clearCart } = useCartStore();
   const { user } = useAuthStore();
+
+  // Guard against any unexpected shapes
+  const cart = Array.isArray(rawCart) ? rawCart : [];
 
   const [tipPercentage, setTipPercentage] = useState(15);
   const [pickupTime, setPickupTime] = useState("As soon as possible (15-20 min)");
@@ -72,15 +23,23 @@ export default function CheckoutPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
   const [couponError, setCouponError] = useState("");
 
-  const subtotal = cart.reduce((acc, item) => acc + item.menuItem.price * item.quantity, 0);
-  const taxAmount = subtotal * (VITE_TAX_PERCENT / 100);
+  const safeItems = cart.filter(
+    (it: any) =>
+      it &&
+      typeof it.quantity === "number" &&
+      it.menuItem &&
+      typeof it.menuItem.price === "number" &&
+      typeof it.menuItem.name === "string"
+  );
+
+  const subtotal = safeItems.reduce((acc: number, item: any) => acc + item.menuItem.price * item.quantity, 0);
+  const taxAmount = subtotal * (TAX_PERCENT / 100);
   const tipAmount = subtotal * (tipPercentage / 100);
 
   let discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
   if (subtotal + taxAmount + tipAmount - discountAmount < 0) {
     discountAmount = subtotal + taxAmount + tipAmount;
   }
-
   const total = subtotal + taxAmount + tipAmount - discountAmount;
 
   const handlePaymentSuccess = async (orderId: string) => {
@@ -89,7 +48,8 @@ export default function CheckoutPage() {
         orderId,
         total,
         pickupTime,
-        items: cart,
+        items: safeItems,
+        notes,
       },
     });
     clearCart();
@@ -103,10 +63,9 @@ export default function CheckoutPage() {
       return;
     }
     try {
-      const isEspressoInCart = cart.some((item) =>
+      const isEspressoInCart = safeItems.some((item: any) =>
         item.menuItem.name.toLowerCase().includes("espresso")
       );
-
       if (isEspressoInCart) {
         setAppliedDiscount({ code: couponCode, amount: 2.0 });
         setCouponCode("");
@@ -134,8 +93,8 @@ export default function CheckoutPage() {
     );
   }
 
-  // 🔹 Empty cart message instead of redirect
-  if (cart.length === 0) {
+  // Empty cart UI (don’t redirect)
+  if (safeItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
         <h2 className="text-2xl font-bold mb-3">Your cart is empty</h2>
@@ -158,8 +117,8 @@ export default function CheckoutPage() {
         <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
           <h2 className="text-2xl font-bold mb-6 text-gray-700">Your Order</h2>
           <div className="space-y-4 mb-6">
-            {cart.map((item) => (
-              <div key={item.id} className="flex justify-between items-center text-gray-600">
+            {safeItems.map((item: any) => (
+              <div key={item.id ?? item.menuItem.name} className="flex justify-between items-center text-gray-600">
                 <span>
                   {item.quantity} x {item.menuItem.name}
                 </span>
@@ -204,7 +163,7 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-gray-600">
-              <span>Tax ({VITE_TAX_PERCENT}%)</span>
+              <span>Tax ({TAX_PERCENT}%)</span>
               <span>${taxAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
@@ -275,7 +234,7 @@ export default function CheckoutPage() {
               <SquarePaymentForm
                 amount={total}
                 onPaymentSuccess={handlePaymentSuccess}
-                cartItems={cart}
+                cartItems={safeItems}
                 tipCents={Math.round(tipAmount * 100)}
                 couponCode={appliedDiscount?.code}
               />
