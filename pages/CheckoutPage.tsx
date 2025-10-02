@@ -1,99 +1,72 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { useCartStore } from "../hooks/useCartStore";
 import { useAuthStore } from "../hooks/useAuthStore";
 import SquarePaymentForm from "../components/SquarePaymentForm";
 
-// Tax from Vite env; default to 6 if not present
-const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
-
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { cart: rawCart = [], clearCart } = useCartStore();
+  const { items: rawItems = [], clearCart } = useCartStore();
   const { user } = useAuthStore();
 
-  // Guard against any unexpected shapes
-  const cart = Array.isArray(rawCart) ? rawCart : [];
+  // normalize items in case of unexpected shape
+  const cart = Array.isArray(rawItems) ? rawItems : [];
+  const safeItems = cart.filter((it: any) => it && it.menuItem && it.quantity > 0);
 
-  const [tipPercentage, setTipPercentage] = useState(15);
-  const [pickupTime, setPickupTime] = useState("As soon as possible (15-20 min)");
+  const [pickupTime, setPickupTime] = useState("asap");
   const [notes, setNotes] = useState("");
-  const [couponCode, setCouponCode] = useState("");
+  const [tip, setTip] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
   const [couponError, setCouponError] = useState("");
 
-  const safeItems = cart.filter(
-    (it: any) =>
-      it &&
-      typeof it.quantity === "number" &&
-      it.menuItem &&
-      typeof it.menuItem.price === "number" &&
-      typeof it.menuItem.name === "string"
+  // tax percent from env or default 6%
+  const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
+
+  const subtotal = safeItems.reduce(
+    (sum, item: any) => sum + item.menuItem.price * item.quantity,
+    0
   );
+  const discount = appliedDiscount ? appliedDiscount.amount : 0;
+  const taxedAmount = (subtotal - discount) * (TAX_PERCENT / 100);
+  const total = subtotal - discount + taxedAmount + tip;
 
-  const subtotal = safeItems.reduce((acc: number, item: any) => acc + item.menuItem.price * item.quantity, 0);
-  const taxAmount = subtotal * (TAX_PERCENT / 100);
-  const tipAmount = subtotal * (tipPercentage / 100);
-
-  let discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
-  if (subtotal + taxAmount + tipAmount - discountAmount < 0) {
-    discountAmount = subtotal + taxAmount + tipAmount;
-  }
-  const total = subtotal + taxAmount + tipAmount - discountAmount;
-
-  const handlePaymentSuccess = async (orderId: string) => {
-    navigate("/confirmation", {
-      state: {
-        orderId,
-        total,
-        pickupTime,
-        items: safeItems,
-        notes,
-      },
-    });
-    clearCart();
-  };
-
-  const handleApplyCoupon = async () => {
+  const handleApplyCoupon = (couponCode: string) => {
     setCouponError("");
-    setAppliedDiscount(null);
-    if (!couponCode) {
-      setCouponError("Please enter a code.");
-      return;
-    }
-    try {
-      const isEspressoInCart = safeItems.some((item: any) =>
-        item.menuItem.name.toLowerCase().includes("espresso")
-      );
-      if (isEspressoInCart) {
-        setAppliedDiscount({ code: couponCode, amount: 2.0 });
-        setCouponCode("");
-      } else {
-        setCouponError("This code requires an Espresso Shot in your cart.");
+    if (couponCode.toLowerCase() === "espresso") {
+      try {
+        const isEspressoInCart = safeItems.some((item: any) =>
+          item.menuItem.name.toLowerCase().includes("espresso")
+        );
+        if (isEspressoInCart) {
+          setAppliedDiscount({ code: couponCode, amount: 2.0 });
+        } else {
+          setCouponError("This code requires an Espresso Shot in your cart.");
+        }
+      } catch {
+        setCouponError("Could not validate coupon.");
       }
-    } catch (error: any) {
-      setCouponError(error.message || "Invalid coupon code.");
-      setAppliedDiscount(null);
+    } else {
+      setCouponError("Invalid coupon code.");
     }
   };
 
+  // Require sign-in
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <h2 className="text-2xl font-bold mb-4">Please Sign In</h2>
-        <p className="mb-6">You need to be signed in to complete your order.</p>
+        <p className="mb-6">You must be signed in to checkout.</p>
         <button
-          onClick={() => navigate("/login")}
-          className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => navigate("/account")}
+          className="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-900 transition-colors"
         >
-          Go to Sign In
+          Sign In
         </button>
       </div>
     );
   }
 
-  // Empty cart UI (don’t redirect)
+  // Empty cart state
   if (safeItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
@@ -112,136 +85,125 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       <h1 className="text-4xl font-extrabold mb-8 text-gray-800 border-b pb-4">Checkout</h1>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
         {/* Order Summary */}
-        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-2xl font-bold mb-6 text-gray-700">Your Order</h2>
-          <div className="space-y-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
+          <ul className="divide-y divide-gray-200">
             {safeItems.map((item: any) => (
-              <div key={item.id ?? item.menuItem.name} className="flex justify-between items-center text-gray-600">
-                <span>
-                  {item.quantity} x {item.menuItem.name}
-                </span>
-                <span>${(item.menuItem.price * item.quantity).toFixed(2)}</span>
-              </div>
+              <li key={item.id} className="py-4 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">{item.menuItem.name}</p>
+                  <p className="text-sm text-gray-600">
+                    Qty: {item.quantity} × ${item.menuItem.price.toFixed(2)}
+                  </p>
+                </div>
+                <p className="font-semibold">
+                  ${(item.menuItem.price * item.quantity).toFixed(2)}
+                </p>
+              </li>
             ))}
+          </ul>
+
+          {/* Totals */}
+          <div className="mt-6 space-y-2 text-gray-700">
+            <p>Subtotal: ${subtotal.toFixed(2)}</p>
+            {appliedDiscount && <p>Discount: -${discount.toFixed(2)}</p>}
+            <p>Tax ({TAX_PERCENT}%): ${taxedAmount.toFixed(2)}</p>
+            {tip > 0 && <p>Tip: ${tip.toFixed(2)}</p>}
+            <p className="text-xl font-bold">Total: ${total.toFixed(2)}</p>
           </div>
 
-          {/* Coupon Code Section */}
-          <div className="mb-6">
-            <label htmlFor="coupon" className="block text-sm font-medium text-gray-700 mb-2">
-              Have a code?
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                id="coupon"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                placeholder="Enter reward code"
-                className="flex-grow p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              />
-              <button
-                onClick={handleApplyCoupon}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors font-semibold disabled:bg-gray-400"
-              >
-                Apply
-              </button>
-            </div>
-            {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
+          {/* Coupon */}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Apply Coupon</h3>
+            <CouponForm onApply={handleApplyCoupon} />
+            {couponError && <p className="text-red-500 mt-2">{couponError}</p>}
           </div>
 
-          <div className="border-t border-gray-200 pt-6 space-y-3">
-            <div className="flex justify-between text-gray-600">
-              <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            {appliedDiscount && (
-              <div className="flex justify-between text-green-600 font-semibold">
-                <span>Discount ({appliedDiscount.code})</span>
-                <span>-${discountAmount.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-gray-600">
-              <span>Tax ({TAX_PERCENT}%)</span>
-              <span>${taxAmount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Tip ({tipPercentage}%)</span>
-              <span>${tipAmount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-2xl font-extrabold text-gray-800 mt-4 pt-4 border-t border-gray-300">
-              <span>Total</span>
-              <span>${total.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Order Options & Payment */}
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-xl font-bold mb-4 text-gray-700">Pickup Time</h2>
-            <div className="flex flex-wrap gap-3">
-              {["As soon as possible (15-20 min)", "In 30 minutes", "In 1 hour"].map((time) => (
+          {/* Tip */}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Add a Tip</h3>
+            <div className="flex gap-2">
+              {[0, 1, 2, 5].map((amt) => (
                 <button
-                  key={time}
-                  onClick={() => setPickupTime(time)}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    pickupTime === time
-                      ? "bg-gray-800 text-white shadow-md"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                  key={amt}
+                  onClick={() => setTip(amt)}
+                  className={`px-3 py-2 rounded border ${
+                    tip === amt ? "bg-gray-800 text-white" : "bg-white text-gray-800"
                   }`}
                 >
-                  {time}
+                  {amt === 0 ? "No Tip" : `$${amt}`}
                 </button>
               ))}
             </div>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold mb-4 text-gray-700">Add a Tip</h2>
-            <div className="flex flex-wrap gap-3">
-              {[15, 20, 25].map((perc) => (
-                <button
-                  key={perc}
-                  onClick={() => setTipPercentage(perc)}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                    tipPercentage === perc
-                      ? "bg-gray-800 text-white shadow-md"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
-                  }`}
-                >
-                  {perc}%
-                </button>
-              ))}
-            </div>
+          {/* Pickup Time */}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Pickup Time</h3>
+            <select
+              value={pickupTime}
+              onChange={(e) => setPickupTime(e.target.value)}
+              className="w-full border p-2 rounded"
+            >
+              <option value="asap">ASAP</option>
+              <option value="5">In 5 minutes</option>
+              <option value="10">In 10 minutes</option>
+              <option value="15">In 15 minutes</option>
+            </select>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold mb-4 text-gray-700">Order Notes</h2>
+          {/* Notes */}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Order Notes</h3>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any special requests?"
-              className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full border p-2 rounded"
               rows={3}
-            ></textarea>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-bold mb-4 text-gray-700">Payment</h2>
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <SquarePaymentForm
-                amount={total}
-                onPaymentSuccess={handlePaymentSuccess}
-                cartItems={safeItems}
-                tipCents={Math.round(tipAmount * 100)}
-                couponCode={appliedDiscount?.code}
-              />
-            </div>
+              placeholder="Any special instructions?"
+            />
           </div>
         </div>
+
+        {/* Payment */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Payment</h2>
+          <SquarePaymentForm
+            amount={total}
+            onSuccess={() => {
+              clearCart();
+              navigate("/confirmation");
+            }}
+          />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function CouponForm({ onApply }: { onApply: (code: string) => void }) {
+  const [code, setCode] = useState("");
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        className="border p-2 flex-grow rounded"
+        placeholder="Enter coupon"
+      />
+      <button
+        onClick={() => {
+          if (code.trim()) onApply(code.trim());
+        }}
+        className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
+      >
+        Apply
+      </button>
     </div>
   );
 }
