@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { useCartStore } from "../hooks/useCartStore";
 import { useAuthStore } from "../hooks/useAuthStore";
 import SquarePaymentForm from "../components/SquarePaymentForm";
-import { VITE_TAX_PERCENT as TAX_PERCENT } from "../constants";
 
-const VITE_TAX_PERCENT: number = (typeof TAX_PERCENT === "number" ? TAX_PERCENT : 6);
+const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("");
 
   const subtotal = cart.reduce((acc, item) => acc + item.menuItem.price * item.quantity, 0);
-  const taxAmount = subtotal * (VITE_TAX_PERCENT / 100);
+  const taxAmount = subtotal * (TAX_PERCENT / 100);
   const tipAmount = subtotal * (tipPercentage / 100);
 
   let discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   }
   const total = subtotal + taxAmount + tipAmount - discountAmount;
 
+  // Restore original behavior: empty cart -> go back to menu
   useEffect(() => {
     if (cart.length === 0) {
       navigate("/menu");
@@ -42,6 +43,7 @@ export default function CheckoutPage() {
         total,
         pickupTime,
         items: cart,
+        notes,
       },
     });
     clearCart();
@@ -55,7 +57,9 @@ export default function CheckoutPage() {
       return;
     }
     try {
-      const isEspressoInCart = cart.some((item) => item.menuItem.name.toLowerCase().includes("espresso"));
+      const isEspressoInCart = cart.some((item) =>
+        item.menuItem.name.toLowerCase().includes("espresso")
+      );
       if (isEspressoInCart) {
         setAppliedDiscount({ code: couponCode, amount: 2.0 });
         setCouponCode("");
@@ -73,7 +77,10 @@ export default function CheckoutPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <h2 className="text-2xl font-bold mb-4">Please Sign In</h2>
         <p className="mb-6">You need to be signed in to complete your order.</p>
-        <button onClick={() => navigate("/login")} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => navigate("/login")}
+          className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
+        >
           Go to Sign In
         </button>
       </div>
@@ -134,7 +141,7 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-gray-600">
-              <span>Tax ({VITE_TAX_PERCENT}%)</span>
+              <span>Tax ({TAX_PERCENT}%)</span>
               <span>${taxAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
