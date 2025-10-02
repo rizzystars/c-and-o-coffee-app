@@ -4,12 +4,17 @@ import { useCartStore } from "../hooks/useCartStore";
 import { useAuthStore } from "../hooks/useAuthStore";
 import SquarePaymentForm from "../components/SquarePaymentForm";
 
+// Normalize price so $1.00 doesn't become $100.00
+function normalizePrice(price: number): number {
+  // If price looks like cents (e.g., 100), divide by 100
+  return price > 10 ? price / 100 : price;
+}
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items: rawItems = [], clearCart } = useCartStore();
   const { user } = useAuthStore();
 
-  // normalize items in case of unexpected shape
   const cart = Array.isArray(rawItems) ? rawItems : [];
   const safeItems = cart.filter((it: any) => it && it.menuItem && it.quantity > 0);
 
@@ -19,11 +24,11 @@ export default function CheckoutPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
   const [couponError, setCouponError] = useState("");
 
-  // tax percent from env or default 6%
   const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
 
+  // use normalized prices for all totals
   const subtotal = safeItems.reduce(
-    (sum, item: any) => sum + item.menuItem.price * item.quantity,
+    (sum, item: any) => sum + normalizePrice(item.menuItem.price) * item.quantity,
     0
   );
   const discount = appliedDiscount ? appliedDiscount.amount : 0;
@@ -50,7 +55,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // Require sign-in
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
@@ -66,7 +70,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Empty cart state
   if (safeItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
@@ -96,11 +99,11 @@ export default function CheckoutPage() {
                 <div>
                   <p className="font-semibold">{item.menuItem.name}</p>
                   <p className="text-sm text-gray-600">
-                    Qty: {item.quantity} × ${item.menuItem.price.toFixed(2)}
+                    Qty: {item.quantity} × ${normalizePrice(item.menuItem.price).toFixed(2)}
                   </p>
                 </div>
                 <p className="font-semibold">
-                  ${(item.menuItem.price * item.quantity).toFixed(2)}
+                  ${(normalizePrice(item.menuItem.price) * item.quantity).toFixed(2)}
                 </p>
               </li>
             ))}
