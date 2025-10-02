@@ -1,6 +1,11 @@
 import React, { useEffect } from "react";
-import Square from "@square/web-sdk";
 import { toast } from "react-hot-toast";
+
+declare global {
+  interface Window {
+    Square: any;
+  }
+}
 
 interface SquarePaymentFormProps {
   amountCents: number;
@@ -26,10 +31,15 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
     async function initSquare() {
       try {
-        const payments = Square.payments(
-          process.env.REACT_APP_SQUARE_APP_ID!,
-          process.env.REACT_APP_SQUARE_LOCATION_ID!
+        if (!window.Square) {
+          throw new Error("Square.js SDK not loaded.");
+        }
+
+        const payments = window.Square.payments(
+          import.meta.env.VITE_SQUARE_APPLICATION_ID!,
+          import.meta.env.VITE_SQUARE_LOCATION_ID!
         );
+
         card = await payments.card();
         await card.attach("#card-container");
       } catch (err) {
@@ -49,10 +59,15 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
   async function handlePayment() {
     try {
-      const payments = Square.payments(
-        process.env.REACT_APP_SQUARE_APP_ID!,
-        process.env.REACT_APP_SQUARE_LOCATION_ID!
+      if (!window.Square) {
+        throw new Error("Square.js SDK not available.");
+      }
+
+      const payments = window.Square.payments(
+        import.meta.env.VITE_SQUARE_APPLICATION_ID!,
+        import.meta.env.VITE_SQUARE_LOCATION_ID!
       );
+
       const card = await payments.card();
       await card.attach("#card-container");
 
