@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Payments } from "@square/web-sdk";
+import Square from "@square/web-sdk";
 import { toast } from "react-hot-toast";
 
 interface SquarePaymentFormProps {
@@ -26,7 +26,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
     async function initSquare() {
       try {
-        const payments = Payments(
+        const payments = Square.payments(
           process.env.REACT_APP_SQUARE_APP_ID!,
           process.env.REACT_APP_SQUARE_LOCATION_ID!
         );
@@ -49,7 +49,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
   async function handlePayment() {
     try {
-      const payments = Payments(
+      const payments = Square.payments(
         process.env.REACT_APP_SQUARE_APP_ID!,
         process.env.REACT_APP_SQUARE_LOCATION_ID!
       );
