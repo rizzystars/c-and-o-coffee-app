@@ -1,0 +1,14 @@
+
+html, body, #root { height: 100%; }
+/* Fixed background across the whole app */
+body {
+  margin: 0;
+  background-image: url('/coffee_elves_2.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-attachment: fixed; /* keep image static while content scrolls */
+}
+
+/* Make main app containers transparent so the background shows through */
+* { background-color: transparent !important; }

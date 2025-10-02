@@ -1,0 +1,5 @@
+{
+  "name": "C&O Coffee Collective Ordering",
+  "description": "A modern, production-ready online ordering website for C&O Coffee Collective, featuring customer accounts, a loyalty program, Square checkout, and real-time inventory sync.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,32 @@
+functionsDirectory = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\netlify\\functions"
+functionsDirectoryOrigin = "config-v1"
+plugins = []
+headers = []
+redirects = []
+
+[build]
+publish = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\dist"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build"
+functions = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\netlify\\functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions."*"]
+external_node_modules = ["@supabase/supabase-js"]
+node_bundler = "esbuild"
