@@ -3,66 +3,37 @@ import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../hooks/useCartStore";
 import { useAuthStore } from "../hooks/useAuthStore";
 import SquarePaymentForm from "../components/SquarePaymentForm";
+import { toast } from "react-hot-toast";
 
-// Normalize price so $1.00 doesn't become $100.00
-function normalizePrice(price: number): number {
-  // If price looks like cents (e.g., 100), divide by 100
-  return price > 10 ? price / 100 : price;
-}
+// normalize prices (handles cents vs dollars)
+const normalizePrice = (val: any) => {
+  const n = Number(val) || 0;
+  return n > 50 ? n / 100 : n;
+};
 
-export default function CheckoutPage() {
+const TAX_PERCENT = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
+
+const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
-  const { items: rawItems = [], clearCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { items, clearCart } = useCartStore();
+  const user = useAuthStore((state) => state.user);
 
-  const cart = Array.isArray(rawItems) ? rawItems : [];
-  const safeItems = cart.filter((it: any) => it && it.menuItem && it.quantity > 0);
-
-  const [pickupTime, setPickupTime] = useState("asap");
-  const [notes, setNotes] = useState("");
-  const [tip, setTip] = useState(0);
-  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
+  const [pickupTime, setPickupTime] = useState("ASAP");
+  const [tipPercent, setTipPercent] = useState(0);
 
-  const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
-
-  // use normalized prices for all totals
-  const subtotal = safeItems.reduce(
-    (sum, item: any) => sum + normalizePrice(item.menuItem.price) * item.quantity,
-    0
-  );
-  const discount = appliedDiscount ? appliedDiscount.amount : 0;
-  const taxedAmount = (subtotal - discount) * (TAX_PERCENT / 100);
-  const total = subtotal - discount + taxedAmount + tip;
-
-  const handleApplyCoupon = (couponCode: string) => {
-    setCouponError("");
-    if (couponCode.toLowerCase() === "espresso") {
-      try {
-        const isEspressoInCart = safeItems.some((item: any) =>
-          item.menuItem.name.toLowerCase().includes("espresso")
-        );
-        if (isEspressoInCart) {
-          setAppliedDiscount({ code: couponCode, amount: 2.0 });
-        } else {
-          setCouponError("This code requires an Espresso Shot in your cart.");
-        }
-      } catch {
-        setCouponError("Could not validate coupon.");
-      }
-    } else {
-      setCouponError("Invalid coupon code.");
-    }
-  };
+  const cart = Array.isArray(items) ? items : [];
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-        <h2 className="text-2xl font-bold mb-4">Please Sign In</h2>
-        <p className="mb-6">You must be signed in to checkout.</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
+        <h2 className="text-2xl font-bold mb-4">Please sign in to checkout</h2>
         <button
-          onClick={() => navigate("/account")}
-          className="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-900 transition-colors"
+          onClick={() => navigate("/signin")}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
         >
           Sign In
         </button>
@@ -70,14 +41,13 @@ export default function CheckoutPage() {
     );
   }
 
-  if (safeItems.length === 0) {
+  if (cart.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
         <h2 className="text-2xl font-bold mb-3">Your cart is empty</h2>
-        <p className="text-gray-600 mb-6">Add some items before checking out.</p>
         <button
           onClick={() => navigate("/menu")}
-          className="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-900 transition-colors"
+          className="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900"
         >
           Go to Menu
         </button>
@@ -85,128 +55,154 @@ export default function CheckoutPage() {
     );
   }
 
+  // subtotal in dollars
+  const subtotal = cart.reduce(
+    (sum, item) => sum + normalizePrice(item.menuItem?.price) * (item.quantity || 1),
+    0
+  );
+
+  const tip = subtotal * (tipPercent / 100);
+  const discount = appliedCoupon?.amountCents ? appliedCoupon.amountCents / 100 : 0;
+  const tax = (subtotal - discount + tip) * (TAX_PERCENT / 100);
+  const total = subtotal - discount + tip + tax;
+  const totalCents = Math.round(total * 100);
+
+  // coupon handler
+  async function applyCoupon(e: React.FormEvent) {
+    e.preventDefault();
+    setCouponError("");
+    try {
+      const res = await fetch("/.netlify/functions/coupon-validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.valid) {
+        setCouponError("Invalid or expired coupon code.");
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon(data);
+        toast.success(`Coupon applied: ${data.label}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setCouponError("Coupon validation failed.");
+    }
+  }
+
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8">
-      <h1 className="text-4xl font-extrabold mb-8 text-gray-800 border-b pb-4">Checkout</h1>
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {/* Order Summary */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
-          <ul className="divide-y divide-gray-200">
-            {safeItems.map((item: any) => (
-              <li key={item.id} className="py-4 flex justify-between items-center">
-                <div>
-                  <p className="font-semibold">{item.menuItem.name}</p>
-                  <p className="text-sm text-gray-600">
-                    Qty: {item.quantity} × ${normalizePrice(item.menuItem.price).toFixed(2)}
-                  </p>
-                </div>
-                <p className="font-semibold">
-                  ${(normalizePrice(item.menuItem.price) * item.quantity).toFixed(2)}
-                </p>
-              </li>
-            ))}
-          </ul>
-
-          {/* Totals */}
-          <div className="mt-6 space-y-2 text-gray-700">
-            <p>Subtotal: ${subtotal.toFixed(2)}</p>
-            {appliedDiscount && <p>Discount: -${discount.toFixed(2)}</p>}
-            <p>Tax ({TAX_PERCENT}%): ${taxedAmount.toFixed(2)}</p>
-            {tip > 0 && <p>Tip: ${tip.toFixed(2)}</p>}
-            <p className="text-xl font-bold">Total: ${total.toFixed(2)}</p>
+      {/* Order Summary */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-xl font-semibold mb-3">Order Summary</h2>
+        {cart.map((item, idx) => (
+          <div key={idx} className="flex justify-between py-1 border-b">
+            <span>
+              {item.quantity} × {item.menuItem?.name}
+            </span>
+            <span>
+              ${(normalizePrice(item.menuItem?.price) * item.quantity).toFixed(2)}
+            </span>
           </div>
-
-          {/* Coupon */}
-          <div className="mt-6">
-            <h3 className="font-semibold mb-2">Apply Coupon</h3>
-            <CouponForm onApply={handleApplyCoupon} />
-            {couponError && <p className="text-red-500 mt-2">{couponError}</p>}
-          </div>
-
-          {/* Tip */}
-          <div className="mt-6">
-            <h3 className="font-semibold mb-2">Add a Tip</h3>
-            <div className="flex gap-2">
-              {[0, 1, 2, 5].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setTip(amt)}
-                  className={`px-3 py-2 rounded border ${
-                    tip === amt ? "bg-gray-800 text-white" : "bg-white text-gray-800"
-                  }`}
-                >
-                  {amt === 0 ? "No Tip" : `$${amt}`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Pickup Time */}
-          <div className="mt-6">
-            <h3 className="font-semibold mb-2">Pickup Time</h3>
-            <select
-              value={pickupTime}
-              onChange={(e) => setPickupTime(e.target.value)}
-              className="w-full border p-2 rounded"
-            >
-              <option value="asap">ASAP</option>
-              <option value="5">In 5 minutes</option>
-              <option value="10">In 10 minutes</option>
-              <option value="15">In 15 minutes</option>
-            </select>
-          </div>
-
-          {/* Notes */}
-          <div className="mt-6">
-            <h3 className="font-semibold mb-2">Order Notes</h3>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full border p-2 rounded"
-              rows={3}
-              placeholder="Any special instructions?"
-            />
-          </div>
+        ))}
+        <div className="flex justify-between mt-2">
+          <span>Subtotal</span>
+          <span>${subtotal.toFixed(2)}</span>
         </div>
-
-        {/* Payment */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Payment</h2>
-          <SquarePaymentForm
-            amount={total}
-            onSuccess={() => {
-              clearCart();
-              navigate("/confirmation");
-            }}
-          />
+        {appliedCoupon && (
+          <div className="flex justify-between text-green-600">
+            <span>{appliedCoupon.label}</span>
+            <span>- ${(appliedCoupon.amountCents / 100).toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span>Tip ({tipPercent}%)</span>
+          <span>${tip.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Tax ({TAX_PERCENT}%)</span>
+          <span>${tax.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-lg mt-2">
+          <span>Total</span>
+          <span>${total.toFixed(2)}</span>
         </div>
       </div>
-    </div>
-  );
-}
 
-function CouponForm({ onApply }: { onApply: (code: string) => void }) {
-  const [code, setCode] = useState("");
+      {/* Coupon Form */}
+      <form onSubmit={applyCoupon} className="mb-6">
+        <input
+          type="text"
+          placeholder="Coupon code"
+          value={couponCode}
+          onChange={(e) => setCouponCode(e.target.value)}
+          className="border p-2 rounded mr-2"
+        />
+        <button type="submit" className="bg-gray-700 text-white px-4 py-2 rounded">
+          Apply
+        </button>
+        {couponError && <p className="text-red-600 mt-1">{couponError}</p>}
+      </form>
 
-  return (
-    <div className="flex gap-2">
-      <input
-        type="text"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        className="border p-2 flex-grow rounded"
-        placeholder="Enter coupon"
-      />
-      <button
-        onClick={() => {
-          if (code.trim()) onApply(code.trim());
+      {/* Tip selection */}
+      <div className="mb-6">
+        <label className="font-semibold mr-2">Tip:</label>
+        {[0, 10, 15, 20].map((pct) => (
+          <button
+            key={pct}
+            type="button"
+            onClick={() => setTipPercent(pct)}
+            className={`px-3 py-1 mr-2 rounded ${
+              tipPercent === pct ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+          >
+            {pct}%
+          </button>
+        ))}
+      </div>
+
+      {/* Pickup time */}
+      <div className="mb-6">
+        <label className="font-semibold mr-2">Pickup:</label>
+        <select
+          value={pickupTime}
+          onChange={(e) => setPickupTime(e.target.value)}
+          className="border p-2 rounded"
+        >
+          <option value="ASAP">ASAP</option>
+          <option value="15min">15 minutes</option>
+          <option value="30min">30 minutes</option>
+        </select>
+      </div>
+
+      {/* Notes */}
+      <div className="mb-6">
+        <label className="block font-semibold mb-1">Order Notes:</label>
+        <textarea
+          value={orderNotes}
+          onChange={(e) => setOrderNotes(e.target.value)}
+          className="w-full border p-2 rounded"
+        />
+      </div>
+
+      {/* Payment */}
+      <SquarePaymentForm
+        amountCents={totalCents}
+        items={cart}
+        discount={appliedCoupon}
+        notes={orderNotes}
+        pickupTime={pickupTime}
+        onPaymentSuccess={() => {
+          clearCart();
+          navigate("/order-confirmation");
         }}
-        className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
-      >
-        Apply
-      </button>
+        onPaymentError={(err) => console.error("Payment error:", err)}
+      />
     </div>
   );
-}
+};
+
+export default CheckoutPage;
