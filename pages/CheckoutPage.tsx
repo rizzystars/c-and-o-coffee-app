@@ -8,10 +8,7 @@ import { create } from 'zustand';
 
 // 1. Mock useCartStore from ../hooks/useCartStore
 const useCartStore = create((set) => ({
-  cart: [
-    { id: '1', menuItem: { name: 'Cold Brew Regular', price: 5.75 }, quantity: 1 },
-    { id: '2', menuItem: { name: 'Espresso Regular', price: 2.00 }, quantity: 1 },
-  ],
+  cart: [],  // start with empty cart
   clearCart: () => set({ cart: [] }),
 }));
 
