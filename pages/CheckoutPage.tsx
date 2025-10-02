@@ -1,11 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { create } from 'zustand';
 
-import { useCartStore } from "../hooks/useCartStore";
-import { useAuthStore } from "../hooks/useAuthStore";
-import SquarePaymentForm from "../components/SquarePaymentForm";
+// --- STUBBED DEPENDENCIES ---
+// To make this component runnable, dependencies are temporarily included here.
+// In your project, these would be imported from their actual files.
 
-const TAX_PERCENT: number = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
+// 1. Mock useCartStore from ../hooks/useCartStore
+//    ⬇️ cart now starts EMPTY (no seeded items)
+const useCartStore = create((set) => ({
+  cart: [],
+  clearCart: () => set({ cart: [] }),
+}));
+
+// 2. Mock useAuthStore from ../hooks/useAuthStore
+const useAuthStore = create((set) => ({
+  user: { id: 'test-user', email: 'test@example.com' }, // Assume user is logged in for testing
+}));
+
+// 3. Mock SquarePaymentForm from ../components/SquarePaymentForm
+const SquarePaymentForm = ({ amount, onPaymentSuccess, cartItems, tipCents, couponCode }: { 
+    amount: number; 
+    onPaymentSuccess: (orderId: string) => void; 
+    cartItems: any[]; 
+    tipCents: number; 
+    couponCode?: string 
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleMockPayment = () => {
+    setIsProcessing(true);
+    console.log("Mock Payment Details:", { amount, cartItems, tipCents, couponCode });
+    setTimeout(() => {
+      onPaymentSuccess(`MOCK_ORDER_${Date.now()}`);
+      setIsProcessing(false);
+    }, 1500);
+  };
+
+  return (
+    <div className="text-center p-4 border rounded-lg bg-gray-50">
+      <p className="font-semibold text-gray-700">Payment Form Placeholder</p>
+      <button 
+        onClick={handleMockPayment}
+        disabled={isProcessing}
+        className="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400"
+      >
+        {isProcessing ? 'Processing...' : `Pay $${amount.toFixed(2)}`}
+      </button>
+    </div>
+  );
+};
+
+// 4. Mock constants from ../constants
+const VITE_TAX_PERCENT = 6;
+
+
+// --- FINAL CHECKOUT PAGE COMPONENT ---
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -20,16 +70,17 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("");
 
   const subtotal = cart.reduce((acc, item) => acc + item.menuItem.price * item.quantity, 0);
-  const taxAmount = subtotal * (TAX_PERCENT / 100);
+  const taxAmount = subtotal * (VITE_TAX_PERCENT / 100);
   const tipAmount = subtotal * (tipPercentage / 100);
 
   let discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
+  // Ensure discount doesn't make total negative
   if (subtotal + taxAmount + tipAmount - discountAmount < 0) {
     discountAmount = subtotal + taxAmount + tipAmount;
   }
+
   const total = subtotal + taxAmount + tipAmount - discountAmount;
 
-  // Restore original behavior: empty cart -> go back to menu
   useEffect(() => {
     if (cart.length === 0) {
       navigate("/menu");
@@ -37,13 +88,13 @@ export default function CheckoutPage() {
   }, [cart, navigate]);
 
   const handlePaymentSuccess = async (orderId: string) => {
+    // Pass order details to confirmation page
     navigate("/confirmation", {
       state: {
         orderId,
         total,
         pickupTime,
         items: cart,
-        notes,
       },
     });
     clearCart();
@@ -56,31 +107,31 @@ export default function CheckoutPage() {
       setCouponError("Please enter a code.");
       return;
     }
+    // This is a simplified validation for demonstration.
+    // For a real application, this should call a backend function to validate the code.
     try {
-      const isEspressoInCart = cart.some((item) =>
-        item.menuItem.name.toLowerCase().includes("espresso")
-      );
+      const isEspressoInCart = cart.some(item => item.menuItem.name.toLowerCase().includes("espresso"));
+      
       if (isEspressoInCart) {
-        setAppliedDiscount({ code: couponCode, amount: 2.0 });
-        setCouponCode("");
+         setAppliedDiscount({ code: couponCode, amount: 2.00 }); // Assuming espresso is $2.00
+         setCouponCode("");
       } else {
         setCouponError("This code requires an Espresso Shot in your cart.");
       }
+
     } catch (error: any) {
       setCouponError(error.message || "Invalid coupon code.");
       setAppliedDiscount(null);
     }
   };
 
+
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <h2 className="text-2xl font-bold mb-4">Please Sign In</h2>
         <p className="mb-6">You need to be signed in to complete your order.</p>
-        <button
-          onClick={() => navigate("/login")}
-          className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
-        >
+        <button onClick={() => navigate("/login")} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
           Go to Sign In
         </button>
       </div>
@@ -129,6 +180,7 @@ export default function CheckoutPage() {
             {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
           </div>
 
+
           <div className="border-t border-gray-200 pt-6 space-y-3">
             <div className="flex justify-between text-gray-600">
               <span>Subtotal</span>
@@ -137,11 +189,11 @@ export default function CheckoutPage() {
             {appliedDiscount && (
               <div className="flex justify-between text-green-600 font-semibold">
                 <span>Discount ({appliedDiscount.code})</span>
-                <span>- ${discountAmount.toFixed(2)}</span>
+                <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-gray-600">
-              <span>Tax ({TAX_PERCENT}%)</span>
+              <span>Tax ({VITE_TAX_PERCENT}%)</span>
               <span>${taxAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
@@ -165,9 +217,7 @@ export default function CheckoutPage() {
                   key={time}
                   onClick={() => setPickupTime(time)}
                   className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    pickupTime === time
-                      ? "bg-gray-800 text-white shadow-md"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    pickupTime === time ? "bg-gray-800 text-white shadow-md" : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
                   }`}
                 >
                   {time}
@@ -184,9 +234,7 @@ export default function CheckoutPage() {
                   key={perc}
                   onClick={() => setTipPercentage(perc)}
                   className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                    tipPercentage === perc
-                      ? "bg-gray-800 text-white shadow-md"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    tipPercentage === perc ? "bg-gray-800 text-white shadow-md" : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
                   }`}
                 >
                   {perc}%
@@ -209,7 +257,7 @@ export default function CheckoutPage() {
           <div>
             <h2 className="text-xl font-bold mb-4 text-gray-700">Payment</h2>
             <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <SquarePaymentForm
+               <SquarePaymentForm
                 amount={total}
                 onPaymentSuccess={handlePaymentSuccess}
                 cartItems={cart}
