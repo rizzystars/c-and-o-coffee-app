@@ -1,7 +1,7 @@
 // file: netlify/functions/coupon-validate.ts
 // Runtime: Netlify Functions (legacy) — named export `handler`
 import { createClient } from '@supabase/supabase-js';
-console.log('coupon-validate VERSION v10-METADATA-CLEANUP'); // Updated version tag
+console.log('coupon-validate VERSION v11-FIXED-ESPRESSO-PRICE'); // Updated version tag
 
 // --- START: MODIFIED TYPE DEFINITIONS ---
 type CouponRow = {
@@ -32,8 +32,9 @@ function getDiscountDetails(rewardType: string) {
 
   switch (rewardType) {
     case 'ESPRESSO_2OZ': 
-      // Assuming this reward is for a fixed dollar amount (e.g., $3.50, expressed in cents)
-      return { discount_type: 'amount' as const, discount_value: 350 }; 
+      // FIX APPLIED: Changed discount_value from 350 ($3.50) to 200 ($2.00) 
+      // to match the price of the single espresso item.
+      return { discount_type: 'amount' as const, discount_value: 200 }; 
     case 'LOYALTY_DISC_ID_LATTE': 
       // Assuming this is a percentage discount (e.g., 20% off)
       return { discount_type: 'percent' as const, discount_value: 20 };
