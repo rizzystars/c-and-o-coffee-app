@@ -1,23 +1,21 @@
-// file: netlify/functions/coupon-validate.ts
 // Runtime: Netlify Functions (legacy) — named export `handler`
-
 import { createClient } from '@supabase/supabase-js';
-
-// Marker to confirm deploy version
-console.log('coupon-validate VERSION v3-schema-tolerant');
+console.log('coupon-validate VERSION v4-ilike-schema-safe');
 
 type CouponRow = {
   id: string;
   code: string;
   discount_type: 'amount' | 'percent';
   discount_value: number; // cents for 'amount'; 0-100 for 'percent'
-  // Optional & aliasy fields:
+
+  // Expiration variants
   expires_at?: string | null;
   expires_on?: string | null;
   expiration?: string | null;
   valid_until?: string | null;
   valid_to?: string | null;
 
+  // Redemption variants
   redeemed_at?: string | null;
   redeemed?: boolean | null;
   is_redeemed?: boolean | null;
@@ -35,23 +33,12 @@ type Ok = {
   row: Partial<CouponRow>;
 };
 
-type Err = {
-  ok: false;
-  code?: string;
-  message: string;
-  hint?: string;
-};
+type Err = { ok: false; code?: string; message: string; hint?: string };
 
-const JSON_HEADERS = {
-  'content-type': 'application/json',
-  'cache-control': 'no-store',
-};
+const JSON_HEADERS = { 'content-type': 'application/json', 'cache-control': 'no-store' };
 
 function allowOrigin(event?: any) {
-  const origin =
-    process.env.SITE_URL ||
-    (event?.headers?.origin ? String(event.headers.origin) : '*');
-
+  const origin = process.env.SITE_URL || (event?.headers?.origin ? String(event.headers.origin) : '*');
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-headers': 'content-type',
@@ -81,7 +68,7 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 // Helpers to tolerate schema differences
-function pickExpiry(row: CouponRow): {field?: string; value?: string | null} {
+function pickExpiry(row: CouponRow): { field?: string; value?: string | null } {
   const fields = ['expires_at', 'expires_on', 'expiration', 'valid_until', 'valid_to'] as const;
   for (const f of fields) {
     const v = (row as any)[f];
@@ -94,13 +81,11 @@ function isExpired(row: CouponRow): boolean {
   const { value } = pickExpiry(row);
   if (!value) return false; // No expiry column → treat as not expired
   const v = String(value);
-  // Accept YYYY-MM-DD or ISO
-  const asDate = v.length <= 10 ? new Date(v + 'T23:59:59.999Z') : new Date(v);
-  return Number.isFinite(+asDate) && asDate < new Date();
+  const d = v.length <= 10 ? new Date(v + 'T23:59:59.999Z') : new Date(v);
+  return Number.isFinite(+d) && d < new Date();
 }
 
 function isRedeemed(row: CouponRow): boolean {
-  // Accept a few ways this can be stored
   if (row.redeemed_at) return true;
   if (row.redeemed === true) return true;
   if (row.is_redeemed === true) return true;
@@ -109,14 +94,12 @@ function isRedeemed(row: CouponRow): boolean {
 }
 
 export const handler = async (event: any) => {
-  // CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: { ...allowOrigin(event) }, body: '' };
   }
 
   logHeader('coupon-validate START');
 
-  // Method check
   if (event.httpMethod !== 'POST') {
     console.log(`Bad method: ${event.httpMethod}`);
     return {
@@ -126,7 +109,6 @@ export const handler = async (event: any) => {
     };
   }
 
-  // Env check
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -163,11 +145,8 @@ export const handler = async (event: any) => {
     };
   }
 
-  const rawCode = String(body?.code || '').trim().toUpperCase();
-  console.log('Incoming payload:', {
-    method: event.httpMethod,
-    code_received: rawCode || '(empty)',
-  });
+  const rawCode = String(body?.code ?? '').trim(); // ← no uppercasing
+  console.log('Incoming payload:', { method: event.httpMethod, code_received: rawCode || '(empty)' });
 
   if (!rawCode) {
     return {
@@ -177,24 +156,20 @@ export const handler = async (event: any) => {
     };
   }
 
-  // Create Supabase client *after* env validation
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // Don’t reference columns that might not exist. Fetch first, filter in app.
     const selectCols =
       'id, code, discount_type, discount_value, expires_at, expires_on, expiration, valid_until, valid_to, redeemed_at, redeemed, is_redeemed, status, metadata';
+
+    // Case-insensitive exact match
     const query = supabase
       .from('pending_rewards')
       .select(selectCols)
-      .eq('code', rawCode)
+      .ilike('code', rawCode)
       .limit(1);
 
-    console.log('Supabase query starting:', {
-      table: 'pending_rewards',
-      select: selectCols,
-      where: { code: rawCode },
-    });
+    console.log('Supabase query starting:', { table: 'pending_rewards', select: selectCols, where: { code: rawCode } });
 
     const { data, error } = await withTimeout(query, 10_000);
 
@@ -216,20 +191,24 @@ export const handler = async (event: any) => {
     }
 
     const row = data[0] as CouponRow;
-    const { field: expiryField, value: expiryValue } = pickExpiry(row);
 
     console.log('Row inspection:', {
       id: row.id,
       code: row.code,
-      hasExpiryField: expiryField || '(none)',
-      expiryValue: expiryValue || '(none)',
       hasRedeemedAt: !!row.redeemed_at,
-      redeemedBool: row.redeemed ?? null,
-      isRedeemedBool: row.is_redeemed ?? null,
+      redeemed: row.redeemed ?? null,
+      is_redeemed: row.is_redeemed ?? null,
       status: row.status ?? null,
+      expiryField: (() => {
+        const p = pickExpiry(row);
+        return p.field || '(none)';
+      })(),
+      expiryValue: (() => {
+        const p = pickExpiry(row);
+        return p.value || '(none)';
+      })(),
     });
 
-    // Check redeemed
     if (isRedeemed(row)) {
       console.warn('Coupon already redeemed:', { id: row.id, code: row.code });
       return {
@@ -239,9 +218,9 @@ export const handler = async (event: any) => {
       };
     }
 
-    // Check expired
     if (isExpired(row)) {
-      console.warn('Coupon expired:', { id: row.id, expiryField, expiryValue });
+      const { field, value } = pickExpiry(row);
+      console.warn('Coupon expired:', { id: row.id, field, value });
       return {
         statusCode: 410,
         headers: { ...JSON_HEADERS, ...allowOrigin(event) },
@@ -249,7 +228,6 @@ export const handler = async (event: any) => {
       };
     }
 
-    // Success — DO NOT mark redeemed here; do that after successful Square payment.
     const ok: Ok = {
       ok: true,
       code: row.code,
@@ -258,7 +236,6 @@ export const handler = async (event: any) => {
       message: 'Coupon valid',
       row: {
         id: row.id,
-        // echo whichever expiry field exists
         expires_at: row.expires_at ?? row.expires_on ?? row.expiration ?? row.valid_until ?? row.valid_to ?? null,
         metadata: row.metadata ?? null,
       },
@@ -271,11 +248,7 @@ export const handler = async (event: any) => {
       discount_value: row.discount_value,
     });
 
-    return {
-      statusCode: 200,
-      headers: { ...JSON_HEADERS, ...allowOrigin(event) },
-      body: JSON.stringify(ok),
-    };
+    return { statusCode: 200, headers: { ...JSON_HEADERS, ...allowOrigin(event) }, body: JSON.stringify(ok) };
   } catch (err: any) {
     console.error('Unhandled error during validation:', {
       name: err?.name,

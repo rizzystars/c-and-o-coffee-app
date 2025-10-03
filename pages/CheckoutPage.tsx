@@ -13,12 +13,40 @@ const normalizePrice = (val: any) => {
 
 const TAX_PERCENT = Number((import.meta as any).env?.VITE_TAX_PERCENT ?? 6);
 
+// Types for normalized coupon we store in state
+type CouponClient = {
+  code: string;
+  discount_type: "amount" | "percent";
+  discount_value: number; // cents if 'amount', 0-100 if 'percent'
+  message?: string;
+};
+
+function dollarsToCents(d: number) {
+  return Math.round(d * 100);
+}
+
+function centsToDollars(c: number) {
+  return Math.max(0, c) / 100;
+}
+
+// Calculate discount in **cents** from a coupon and the current subtotal in cents
+function calcDiscountCents(subtotalCents: number, c?: CouponClient | null) {
+  if (!c) return 0;
+  if (c.discount_type === "amount") {
+    return Math.min(subtotalCents, Math.max(0, Math.round(c.discount_value)));
+  }
+  // percent (0-100)
+  const pct = Math.min(100, Math.max(0, c.discount_value));
+  return Math.round(subtotalCents * (pct / 100));
+}
+
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, clearCart } = useCartStore();
   const user = useAuthStore((state) => state.user);
 
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  // Store *raw* coupon from server (normalized to our CouponClient shape)
+  const [coupon, setCoupon] = useState<CouponClient | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
@@ -55,19 +83,24 @@ const CheckoutPage: React.FC = () => {
     );
   }
 
-  // subtotal in dollars
+  // === Totals ===
+  // subtotal in dollars (from cart)
   const subtotal = cart.reduce(
     (sum, item) => sum + normalizePrice(item.menuItem?.price) * (item.quantity || 1),
     0
   );
+  const subtotalCents = dollarsToCents(subtotal);
 
-  const tip = subtotal * (tipPercent / 100);
-  const discount = appliedCoupon?.amountCents ? appliedCoupon.amountCents / 100 : 0;
+  // discount based on current subtotal + applied coupon
+  const discountCents = calcDiscountCents(subtotalCents, coupon);
+  const discount = centsToDollars(discountCents);
+
+  const tip = subtotal * (tipPercent / 100); // you can switch to cents similarly if you prefer
   const tax = (subtotal - discount + tip) * (TAX_PERCENT / 100);
   const total = subtotal - discount + tip + tax;
-  const totalCents = Math.round(total * 100);
+  const totalCents = dollarsToCents(total);
 
-  // coupon handler
+  // Coupon handler (talks to /.netlify/functions/coupon-validate)
   async function applyCoupon(e: React.FormEvent) {
     e.preventDefault();
     setCouponError("");
@@ -75,18 +108,36 @@ const CheckoutPage: React.FC = () => {
       const res = await fetch("/.netlify/functions/coupon-validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode }),
+        // DO NOT uppercase; backend is case-insensitive already (.ilike)
+        body: JSON.stringify({ code: couponCode.trim() }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.valid) {
-        setCouponError("Invalid or expired coupon code.");
-        setAppliedCoupon(null);
-      } else {
-        setAppliedCoupon(data);
-        toast.success(`Coupon applied: ${data.label}`);
+
+      if (!res.ok || !data?.ok) {
+        setCoupon(null);
+        setCouponError(data?.message || "Invalid or expired coupon code.");
+        return;
       }
+
+      // Normalize to our expected shape
+      const normalized: CouponClient = {
+        code: data.code,
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        message: data.message,
+      };
+      setCoupon(normalized);
+
+      // Friendly label (for UI line item)
+      const label =
+        normalized.discount_type === "amount"
+          ? `Coupon ${normalized.code} (-$${(normalized.discount_value / 100).toFixed(2)})`
+          : `Coupon ${normalized.code} (-${normalized.discount_value}% )`;
+
+      toast.success(`Coupon applied: ${label}`);
     } catch (err: any) {
       console.error(err);
+      setCoupon(null);
       setCouponError("Coupon validation failed.");
     }
   }
@@ -108,16 +159,23 @@ const CheckoutPage: React.FC = () => {
             </span>
           </div>
         ))}
+
         <div className="flex justify-between mt-2">
           <span>Subtotal</span>
           <span>${subtotal.toFixed(2)}</span>
         </div>
-        {appliedCoupon && (
+
+        {coupon && (
           <div className="flex justify-between text-green-600">
-            <span>{appliedCoupon.label}</span>
-            <span>- ${(appliedCoupon.amountCents / 100).toFixed(2)}</span>
+            <span>
+              {coupon.discount_type === "amount"
+                ? `Coupon ${coupon.code}`
+                : `Coupon ${coupon.code} (${coupon.discount_value}% off)`}
+            </span>
+            <span>- ${discount.toFixed(2)}</span>
           </div>
         )}
+
         <div className="flex justify-between">
           <span>Tip ({tipPercent}%)</span>
           <span>${tip.toFixed(2)}</span>
@@ -190,9 +248,15 @@ const CheckoutPage: React.FC = () => {
 
       {/* Payment */}
       <SquarePaymentForm
-        amountCents={totalCents}
+        amountCents={totalCents}          // already discounted + tax + tip
         items={cart}
-        discount={appliedCoupon}
+        discount={{
+          // optional prop if your SquarePaymentForm uses it
+          code: coupon?.code,
+          type: coupon?.discount_type,
+          value: coupon?.discount_value,
+          amountCents: discountCents,
+        }}
         notes={orderNotes}
         pickupTime={pickupTime}
         onPaymentSuccess={() => {
