@@ -17,6 +17,25 @@ interface SquarePaymentFormProps {
   onPaymentError: (error: any) => void;
 }
 
+// Utility function to load the Square SDK script
+const loadSquareSdk = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (window.Square) {
+            resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        // NOTE: The environment specific URL is defined by the VITE_SQUARE_ENV variable
+        const env = import.meta.env.VITE_SQUARE_ENV === 'production' ? '' : 'sandbox/';
+        script.src = `https://js.squareup.com/v2/${env}paymentform`;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load Square SDK script."));
+        document.head.appendChild(script);
+    });
+};
+
+
 const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   amountCents,
   items,
@@ -36,20 +55,19 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
     async function initSquare() {
       try {
-        if (!window.Square) {
-          // Check for the script tag loading issue first
-          throw new Error("Square.js SDK not loaded (window.Square is null).");
-        }
+          // 1. Ensure the SDK script is loaded (loads it if necessary)
+          await loadSquareSdk();
+          
+          // 2. Initialize the payments object
+          const payments = window.Square.payments(
+            import.meta.env.VITE_SQUARE_APPLICATION_ID!,
+            import.meta.env.VITE_SQUARE_LOCATION_ID!
+          );
 
-        const payments = window.Square.payments(
-          import.meta.env.VITE_SQUARE_APPLICATION_ID!,
-          import.meta.env.VITE_SQUARE_LOCATION_ID!
-        );
-
-        card = await payments.card();
-        await card.attach("#card-container");
+          card = await payments.card();
+          await card.attach("#card-container");
         
-        // Store the initialized card instance for later use in handlePayment
+        // 3. Store the initialized card instance
         setCardInstance(card);
         setIsLoading(false);
 
@@ -72,11 +90,10 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   async function handlePayment() {
     try {
       if (!cardInstance) {
-        // If cardInstance is null, it means initialization failed or is still loading
+        // This toast will only show if the user clicks before initialization is complete
         throw new Error("Square SDK not available. Please wait or refresh.");
       }
       
-      // We no longer re-initialize the payment object or attach the card form here.
       // We go directly to tokenization using the stored instance.
 
       const result = await cardInstance.tokenize();
