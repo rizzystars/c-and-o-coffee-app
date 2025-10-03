@@ -1,7 +1,7 @@
 // file: netlify/functions/coupon-validate.ts
 // Runtime: Netlify Functions (legacy) — named export `handler`
 import { createClient } from '@supabase/supabase-js';
-console.log('coupon-validate VERSION v5-ilike-fallback-eq');
+console.log('coupon-validate VERSION v6-eq-only');
 
 type CouponRow = {
   id: string;
@@ -157,30 +157,38 @@ export const handler = async (event: any) => {
     const selectCols =
       'id, code, discount_type, discount_value, expires_at, expires_on, expiration, valid_until, valid_to, redeemed_at, redeemed, is_redeemed, status, metadata';
 
-    // Try case-insensitive match first (works for text columns)
-    console.log('Supabase query starting (1: ilike):', { table: 'pending_rewards', where: { code: rawCode } });
+    // === eq-only lookup (safe for non-text columns) ===
     let data: any[] | null = null;
     let error: any = null;
 
+    // A) exact raw
+    console.log('Supabase query A (eq raw):', { code: rawCode });
     ({ data, error } = await withTimeout(
-      supabase.from('pending_rewards').select(selectCols).ilike('code', rawCode).limit(1),
+      supabase.from('pending_rewards').select(selectCols).eq('code', rawCode).limit(1),
       10_000
     ));
 
-    if (error) {
-      console.warn('ILIKE failed; retry with EQ. Error:', {
-        message: error?.message,
-        details: error?.details,
-        hint: error?.hint,
-      });
-
+    // B) UPPER (if not found or if error)
+    if ((!error && (!data || data.length === 0)) || error) {
+      const up = rawCode.toUpperCase();
+      console.log('Supabase query B (eq upper):', { code: up, prevErr: error?.message });
       ({ data, error } = await withTimeout(
-        supabase.from('pending_rewards').select(selectCols).eq('code', rawCode).limit(1),
+        supabase.from('pending_rewards').select(selectCols).eq('code', up).limit(1),
         10_000
       ));
     }
 
-    console.log('Supabase query result meta:', {
+    // C) lower (if still not found or error)
+    if ((!error && (!data || data.length === 0)) || error) {
+      const lo = rawCode.toLowerCase();
+      console.log('Supabase query C (eq lower):', { code: lo, prevErr: error?.message });
+      ({ data, error } = await withTimeout(
+        supabase.from('pending_rewards').select(selectCols).eq('code', lo).limit(1),
+        10_000
+      ));
+    }
+
+    console.log('Supabase query result:', {
       error: error ? { message: error?.message, details: error?.details } : null,
       rows: data?.length || 0,
       sampleKeys: data?.length ? Object.keys(data[0] || {}) : null,
