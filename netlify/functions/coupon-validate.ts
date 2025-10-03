@@ -1,21 +1,22 @@
+// file: netlify/functions/coupon-validate.ts
 // Runtime: Netlify Functions (legacy) — named export `handler`
 import { createClient } from '@supabase/supabase-js';
-console.log('coupon-validate VERSION v4-ilike-schema-safe');
+console.log('coupon-validate VERSION v5-ilike-fallback-eq');
 
 type CouponRow = {
   id: string;
-  code: string;
+  code: any; // tolerate non-text columns
   discount_type: 'amount' | 'percent';
-  discount_value: number; // cents for 'amount'; 0-100 for 'percent'
+  discount_value: number;
 
-  // Expiration variants
+  // Expiration variants:
   expires_at?: string | null;
   expires_on?: string | null;
   expiration?: string | null;
   valid_until?: string | null;
   valid_to?: string | null;
 
-  // Redemption variants
+  // Redemption variants:
   redeemed_at?: string | null;
   redeemed?: boolean | null;
   is_redeemed?: boolean | null;
@@ -32,10 +33,10 @@ type Ok = {
   message: string;
   row: Partial<CouponRow>;
 };
-
-type Err = { ok: false; code?: string; message: string; hint?: string };
+type Err = { ok: false; code?: string; message: string; hint?: string; debug?: any };
 
 const JSON_HEADERS = { 'content-type': 'application/json', 'cache-control': 'no-store' };
+const DEBUG = process.env.DEBUG_COUPON === '1';
 
 function allowOrigin(event?: any) {
   const origin = process.env.SITE_URL || (event?.headers?.origin ? String(event.headers.origin) : '*');
@@ -51,12 +52,10 @@ function allowOrigin(event?: any) {
 function logHeader(title: string) {
   console.log(`\n=== ${title} @ ${new Date().toISOString()} ===`);
 }
-
 function safeKeyPreview(key?: string | null) {
   if (!key) return 'MISSING';
   return `present (len=${key.length}, starts:${key.slice(0, 4)})`;
 }
-
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   let t: any;
   const timeout = new Promise<never>((_, reject) => {
@@ -66,8 +65,6 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   clearTimeout(t);
   return res;
 }
-
-// Helpers to tolerate schema differences
 function pickExpiry(row: CouponRow): { field?: string; value?: string | null } {
   const fields = ['expires_at', 'expires_on', 'expiration', 'valid_until', 'valid_to'] as const;
   for (const f of fields) {
@@ -76,15 +73,13 @@ function pickExpiry(row: CouponRow): { field?: string; value?: string | null } {
   }
   return {};
 }
-
 function isExpired(row: CouponRow): boolean {
   const { value } = pickExpiry(row);
-  if (!value) return false; // No expiry column → treat as not expired
+  if (!value) return false;
   const v = String(value);
   const d = v.length <= 10 ? new Date(v + 'T23:59:59.999Z') : new Date(v);
   return Number.isFinite(+d) && d < new Date();
 }
-
 function isRedeemed(row: CouponRow): boolean {
   if (row.redeemed_at) return true;
   if (row.redeemed === true) return true;
@@ -145,7 +140,7 @@ export const handler = async (event: any) => {
     };
   }
 
-  const rawCode = String(body?.code ?? '').trim(); // ← no uppercasing
+  const rawCode = String(body?.code ?? '').trim();
   console.log('Incoming payload:', { method: event.httpMethod, code_received: rawCode || '(empty)' });
 
   if (!rawCode) {
@@ -162,25 +157,36 @@ export const handler = async (event: any) => {
     const selectCols =
       'id, code, discount_type, discount_value, expires_at, expires_on, expiration, valid_until, valid_to, redeemed_at, redeemed, is_redeemed, status, metadata';
 
-    // Case-insensitive exact match
-    const query = supabase
-      .from('pending_rewards')
-      .select(selectCols)
-      .ilike('code', rawCode)
-      .limit(1);
+    // Try case-insensitive match first (works for text columns)
+    console.log('Supabase query starting (1: ilike):', { table: 'pending_rewards', where: { code: rawCode } });
+    let data: any[] | null = null;
+    let error: any = null;
 
-    console.log('Supabase query starting:', { table: 'pending_rewards', select: selectCols, where: { code: rawCode } });
+    ({ data, error } = await withTimeout(
+      supabase.from('pending_rewards').select(selectCols).ilike('code', rawCode).limit(1),
+      10_000
+    ));
 
-    const { data, error } = await withTimeout(query, 10_000);
+    if (error) {
+      console.warn('ILIKE failed; retry with EQ. Error:', {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      });
+
+      ({ data, error } = await withTimeout(
+        supabase.from('pending_rewards').select(selectCols).eq('code', rawCode).limit(1),
+        10_000
+      ));
+    }
 
     console.log('Supabase query result meta:', {
-      error: error ? { message: (error as any).message, details: (error as any).details } : null,
+      error: error ? { message: error?.message, details: error?.details } : null,
       rows: data?.length || 0,
       sampleKeys: data?.length ? Object.keys(data[0] || {}) : null,
     });
 
     if (error) throw error;
-
     if (!data || data.length === 0) {
       console.warn('No coupon row found for code:', rawCode);
       return {
@@ -194,19 +200,13 @@ export const handler = async (event: any) => {
 
     console.log('Row inspection:', {
       id: row.id,
-      code: row.code,
+      code: String(row.code),
       hasRedeemedAt: !!row.redeemed_at,
       redeemed: row.redeemed ?? null,
       is_redeemed: row.is_redeemed ?? null,
       status: row.status ?? null,
-      expiryField: (() => {
-        const p = pickExpiry(row);
-        return p.field || '(none)';
-      })(),
-      expiryValue: (() => {
-        const p = pickExpiry(row);
-        return p.value || '(none)';
-      })(),
+      expiryField: (() => pickExpiry(row).field || '(none)')(),
+      expiryValue: (() => pickExpiry(row).value || '(none)')(),
     });
 
     if (isRedeemed(row)) {
@@ -230,7 +230,7 @@ export const handler = async (event: any) => {
 
     const ok: Ok = {
       ok: true,
-      code: row.code,
+      code: String(row.code),
       discount_type: row.discount_type,
       discount_value: row.discount_value,
       message: 'Coupon valid',
@@ -243,24 +243,29 @@ export const handler = async (event: any) => {
 
     console.log('Coupon validated:', {
       id: row.id,
-      code: row.code,
+      code: String(row.code),
       discount_type: row.discount_type,
       discount_value: row.discount_value,
     });
 
     return { statusCode: 200, headers: { ...JSON_HEADERS, ...allowOrigin(event) }, body: JSON.stringify(ok) };
   } catch (err: any) {
-    console.error('Unhandled error during validation:', {
+    const dbg = {
       name: err?.name,
       message: err?.message,
       details: (err as any)?.details,
       hint: (err as any)?.hint,
       stack: err?.stack?.split('\n').slice(0, 5).join(' | '),
-    });
+    };
+    console.error('Unhandled error during validation:', dbg);
     return {
       statusCode: 500,
       headers: { ...JSON_HEADERS, ...allowOrigin(event) },
-      body: JSON.stringify<Err>({ ok: false, message: 'Server error validating coupon' }),
+      body: JSON.stringify<Err>({
+        ok: false,
+        message: 'Server error validating coupon',
+        debug: DEBUG ? dbg : undefined,
+      }),
     };
   } finally {
     logHeader('coupon-validate END');
