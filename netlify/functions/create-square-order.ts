@@ -151,17 +151,3 @@ export const handler: Handler = async (event) => {
     };
   }
 };
-```
-eof
-
-Please save this code locally and then run the following commands to stage and push the final payment logic fix:
-
-```powershell
-# 1. Stage the fixed payment function file
-git add netlify\functions\create-square-order.ts
-
-# 2. Commit the changes
-git commit -m "fix: Fixed Square payment logic to use Square's calculated order total for charge amount."
-
-# 3. Push to GitHub to trigger the live Netlify deployment
-git push
