@@ -1,13 +1,14 @@
 // file: netlify/functions/coupon-validate.ts
 // Runtime: Netlify Functions (legacy) — named export `handler`
 import { createClient } from '@supabase/supabase-js';
-console.log('coupon-validate VERSION v6-eq-only-DEBUG'); // Changed version for clarity
+console.log('coupon-validate VERSION v7-REWARD-TYPE-FIXED'); // Updated version
 
+// --- START: MODIFIED TYPE DEFINITIONS ---
 type CouponRow = {
   id: string;
   code: any; // tolerate non-text columns
-  discount_type: 'amount' | 'percent';
-  discount_value: number;
+  reward_type: string; // <-- NOW using the correct column name from Supabase
+  points_cost: number; // Added for context, though not strictly needed for validation response
 
   // Expiration variants:
   expires_at?: string | null;
@@ -25,11 +26,35 @@ type CouponRow = {
   metadata?: Record<string, any> | null;
 };
 
+// --- HELPER FUNCTION: Maps the reward code to the discount parameters ---
+function getDiscountDetails(rewardType: string) {
+  // 🛑 YOU MUST CUSTOMIZE THIS MAPPING BASED ON YOUR LOYALTY RULES 🛑
+  // This logic determines what discount type/value to return to the frontend.
+  
+  const type = rewardType.toLowerCase().includes('off') ? 'percent' : 'amount';
+
+  switch (rewardType) {
+    case 'ESPRESSO_2OZ': 
+      // Assuming this reward is for a fixed dollar amount (e.g., $3.50, expressed in cents)
+      return { discount_type: 'amount' as const, discount_value: 350 }; 
+    case 'LOYALTY_DISC_ID_LATTE': 
+      // Assuming this is a percentage discount (e.g., 20% off)
+      return { discount_type: 'percent' as const, discount_value: 20 };
+    case 'LOYALTY_DISC_ID_MERCH_15_OFF':
+      return { discount_type: 'percent' as const, discount_value: 15 };
+    default:
+      // Fallback or unknown reward type
+      return { discount_type: 'amount' as const, discount_value: 100 }; // Default to $1.00 off
+  }
+}
+// --- END: MODIFIED TYPE DEFINITIONS ---
+
+
 type Ok = {
   ok: true;
   code: string;
-  discount_type: CouponRow['discount_type'];
-  discount_value: number;
+  discount_type: 'amount' | 'percent'; // <-- Now hardcoded to the result of getDiscountDetails
+  discount_value: number; // <-- Now hardcoded to the result of getDiscountDetails
   message: string;
   row: Partial<CouponRow>;
 };
@@ -38,7 +63,7 @@ type Err = { ok: false; code?: string; message: string; hint?: string; debug?: a
 const JSON_HEADERS = { 'content-type': 'application/json', 'cache-control': 'no-store' };
 const DEBUG = process.env.DEBUG_COUPON === '1';
 
-function allowOrigin(event?: any) {
+function allowOrigin(event: any) {
   const origin = process.env.SITE_URL || (event?.headers?.origin ? String(event.headers.origin) : '*');
   return {
     'access-control-allow-origin': origin,
@@ -56,15 +81,7 @@ function safeKeyPreview(key?: string | null) {
   if (!key) return 'MISSING';
   return `present (len=${key.length}, starts:${key.slice(0, 4)})`;
 }
-async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  let t: any;
-  const timeout = new Promise<never>((_, reject) => {
-    t = setTimeout(() => reject(new Error(`Supabase call timed out after ${ms}ms`)), ms);
-  });
-  const res = await Promise.race([p, timeout]);
-  clearTimeout(t);
-  return res;
-}
+
 function pickExpiry(row: CouponRow): { field?: string; value?: string | null } {
   const fields = ['expires_at', 'expires_on', 'expiration', 'valid_until', 'valid_to'] as const;
   for (const f of fields) {
@@ -77,15 +94,21 @@ function isExpired(row: CouponRow): boolean {
   const { value } = pickExpiry(row);
   if (!value) return false;
   const v = String(value);
-  const d = v.length <= 10 ? new Date(v + 'T23:59:59.999Z') : new Date(v);
+  // Corrected timezone logic for date strings without time (e.g., '2025-10-03')
+  const d = v.length <= 10 ? new Date(v + 'T23:59:59.999Z') : new Date(v); 
   return Number.isFinite(+d) && d < new Date();
 }
 function isRedeemed(row: CouponRow): boolean {
-  if (row.redeemed_at) return true;
-  if (row.redeemed === true) return true;
-  if (row.is_redeemed === true) return true;
-  if (row.status && row.status.toLowerCase() === 'redeemed') return true;
-  return false;
+  // Check for redeemed_at, redeemed, is_redeemed, or status
+  if (row.redeemed_at) return true; 
+  if (row.redeemed === true) return true; 
+  if (row.is_redeemed === true) return true; 
+  if (row.status && row.status.toLowerCase() === 'redeemed') return true; 
+  
+  // Since 'status' is visible and set to 'PENDING', let's make sure it's not 'REDEEMED'
+  if (row.status && row.status.toLowerCase() === 'pending') return false; 
+  
+  return false;
 }
 
 export const handler = async (event: any) => {
@@ -154,38 +177,30 @@ export const handler = async (event: any) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    // --- FIXED: Using existing table column names ---
     const selectCols =
-      'id, code, discount_type, discount_value, expires_at, expires_on, expiration, valid_until, valid_to, redeemed_at, redeemed, is_redeemed, status, metadata';
+      'id, code, reward_type, points_cost, expires_at, expires_on, expiration, valid_until, valid_to, redeemed_at, redeemed, is_redeemed, status, metadata';
 
     // === eq-only lookup (safe for non-text columns) ===
     let data: any[] | null = null;
     let error: any = null;
 
-    // A) exact raw
+    // A) exact raw - Removed withTimeout wrapper
     console.log('Supabase query A (eq raw):', { code: rawCode });
-    ({ data, error } = await withTimeout(
-      supabase.from('pending_rewards').select(selectCols).eq('code', rawCode).limit(1),
-      10_000
-    ));
+    ({ data, error } = await supabase.from('pending_rewards').select(selectCols).eq('code', rawCode).limit(1));
 
-    // B) UPPER (if not found or if error)
+    // B) UPPER (if not found or if error) - Removed withTimeout wrapper
     if ((!error && (!data || data.length === 0)) || error) {
       const up = rawCode.toUpperCase();
       console.log('Supabase query B (eq upper):', { code: up, prevErr: error?.message });
-      ({ data, error } = await withTimeout(
-        supabase.from('pending_rewards').select(selectCols).eq('code', up).limit(1),
-        10_000
-      ));
+      ({ data, error } = await supabase.from('pending_rewards').select(selectCols).eq('code', up).limit(1));
     }
 
-    // C) lower (if still not found or error)
+    // C) lower (if still not found or error) - Removed withTimeout wrapper
     if ((!error && (!data || data.length === 0)) || error) {
       const lo = rawCode.toLowerCase();
       console.log('Supabase query C (eq lower):', { code: lo, prevErr: error?.message });
-      ({ data, error } = await withTimeout(
-        supabase.from('pending_rewards').select(selectCols).eq('code', lo).limit(1),
-        10_000
-      ));
+      ({ data, error } = await supabase.from('pending_rewards').select(selectCols).eq('code', lo).limit(1));
     }
 
     console.log('Supabase query result:', {
@@ -205,10 +220,21 @@ export const handler = async (event: any) => {
     }
 
     const row = data[0] as CouponRow;
+    
+    // --- DEBUG STATUS CHECKS START ---
+    console.log('--- DEBUG STATUS CHECKS ---');
+    console.log('Reward Type:', row.reward_type);
+    console.log('isRedeemed(row) result:', isRedeemed(row));
+    console.log('isExpired(row) result:', isExpired(row));
+    console.log('Current Time (for context):', new Date().toISOString());
+    console.log('---------------------------');
+    // --- DEBUG STATUS CHECKS END ---
+
 
     console.log('Row inspection:', {
       id: row.id,
       code: String(row.code),
+      reward_type: row.reward_type,
       hasRedeemedAt: !!row.redeemed_at,
       redeemed: row.redeemed ?? null,
       is_redeemed: row.is_redeemed ?? null,
@@ -216,14 +242,6 @@ export const handler = async (event: any) => {
       expiryField: (() => pickExpiry(row).field || '(none)')(),
       expiryValue: (() => pickExpiry(row).value || '(none)')(),
     });
-    
-    // --- DEBUG STATUS CHECKS START ---
-    console.log('--- DEBUG STATUS CHECKS ---');
-    console.log('isRedeemed(row) result:', isRedeemed(row));
-    console.log('isExpired(row) result:', isExpired(row));
-    console.log('Current Time (for context):', new Date().toISOString());
-    console.log('---------------------------');
-    // --- DEBUG STATUS CHECKS END ---
 
     if (isRedeemed(row)) {
       console.warn('Coupon already redeemed:', { id: row.id, code: row.code });
@@ -243,12 +261,15 @@ export const handler = async (event: any) => {
         body: JSON.stringify<Err>({ ok: false, code: rawCode, message: 'Coupon expired' }),
       };
     }
+    
+    // --- Get the required discount details from the reward_type ---
+    const { discount_type, discount_value } = getDiscountDetails(row.reward_type);
 
     const ok: Ok = {
       ok: true,
       code: String(row.code),
-      discount_type: row.discount_type,
-      discount_value: row.discount_value,
+      discount_type: discount_type, // Now using inferred type
+      discount_value: discount_value, // Now using inferred value
       message: 'Coupon valid',
       row: {
         id: row.id,
@@ -260,8 +281,9 @@ export const handler = async (event: any) => {
     console.log('Coupon validated:', {
       id: row.id,
       code: String(row.code),
-      discount_type: row.discount_type,
-      discount_value: row.discount_value,
+      reward_type: row.reward_type,
+      discount_type: discount_type,
+      discount_value: discount_value,
     });
 
     return { statusCode: 200, headers: { ...JSON_HEADERS, ...allowOrigin(event) }, body: JSON.stringify(ok) };
