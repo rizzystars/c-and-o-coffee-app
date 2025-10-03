@@ -103,8 +103,8 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
       const sourceId = result.token;
 
-      // Send to Netlify backend
-      const res = await fetch("/.netlify/functions/create-square-order", {
+      // FIX APPLIED: Changed function call from 'create-square-order' to 'pay-square-order'
+      const res = await fetch("/.netlify/functions/pay-square-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
