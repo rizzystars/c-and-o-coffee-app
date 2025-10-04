@@ -1,0 +1,13 @@
+﻿C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\AccountPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\CheckoutPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\ConfirmationPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\HistoryPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\HomePage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\LocationPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\LoginPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\MenuPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\PersonalInfoPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\PrivacyPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\Reset.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\RewardsPage.tsx
+C:\Users\mixed\Downloads\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\pages\UpdatePassword.tsx
