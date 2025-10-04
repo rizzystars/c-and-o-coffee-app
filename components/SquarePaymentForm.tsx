@@ -1,195 +1,101 @@
-// file: components/SquarePaymentForm.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-declare global {
-  interface Window { Square?: any }
+interface SquarePaymentFormProps {
+  onPaymentSuccess: (payment: any) => void;
+  onPaymentError: (error: any) => void;
 }
 
-const SQUARE_SDK_URL = "https://web.squarecdn.com/v1/square.js";
-
-type Discount =
-  | { code: string; type: "amount"; value: number }
-  | { code: string; type: "percent"; value: number };
-
-type Props = {
-  amountCents: number;
-  items: any[];
-  discount?: {
-    code?: string;
-    discount_type?: "amount" | "percent";
-    discount_value?: number;
-    label?: string;
-    amountCents?: number;
-  } | null;
-  notes?: string;
-  pickupTime?: string;
-  onPaymentSuccess?: () => void;
-  onPaymentError?: (err: unknown) => void;
+const mask = (val?: string) => {
+  if (!val) return "(missing)";
+  return val.slice(0, 6) + "…" + val.slice(-4);
 };
 
-function mask(s?: string) {
-  if (!s) return "(empty)";
-  return s.length <= 8 ? s : `${s.slice(0, 4)}…${s.slice(-4)}`;
-}
+const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
+  onPaymentSuccess,
+  onPaymentError,
+}) => {
+  const [status, setStatus] = useState("initial");
 
-async function loadSquareSdk(): Promise<void> {
-  if (window.Square?.payments) return;
-  const existing = document.querySelector<HTMLScriptElement>(
-    `script[src="${SQUARE_SDK_URL}"]`
-  );
-  if (existing) {
-    await new Promise<void>((resolve, reject) => {
-      const onLoad = () => { cleanup(); resolve(); };
-      const onErr  = () => { cleanup(); reject(new Error("Square SDK script failed (existing tag).")); };
-      const cleanup = () => {
-        existing.removeEventListener("load", onLoad);
-        existing.removeEventListener("error", onErr);
-      };
-      existing.addEventListener("load", onLoad, { once: true });
-      existing.addEventListener("error", onErr, { once: true });
-    });
-    return;
-  }
-  await new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = SQUARE_SDK_URL;
-    s.async = true;
-    s.crossOrigin = "anonymous";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Failed to load Square SDK script"));
-    document.head.appendChild(s);
-  });
-}
-
-function normalizeDiscount(d?: Props["discount"]): Discount | null {
-  if (!d) return null;
-  if (d.discount_type && typeof d.discount_value === "number") {
-    return { code: d.code ?? "", type: d.discount_type, value: d.discount_value };
-  }
-  if (typeof d.amountCents === "number") {
-    return { code: d.code ?? "", type: "amount", value: d.amountCents };
-  }
-  return null;
-}
-
-export default function SquarePaymentForm(props: Props) {
-  const { amountCents, items, discount, notes, pickupTime, onPaymentSuccess, onPaymentError } = props;
-  const [status, setStatus] = useState("env-check");
-  const [error, setError]   = useState("");
-  const [payments, setPayments] = useState<any>(null);
-  const [card, setCard]         = useState<any>(null);
-  const cardContainerRef = useRef<HTMLDivElement>(null);
-
-  const appId      = (import.meta as any).env?.VITE_SQUARE_APPLICATION_ID;
-  const locationId = (import.meta as any).env?.VITE_SQUARE_LOCATION_ID;
-  const clientEnv  = (import.meta as any).env?.VITE_SQUARE_ENV || "production";
+  const appId = import.meta.env.VITE_SQUARE_APPLICATION_ID;
+  const locationId = import.meta.env.VITE_SQUARE_LOCATION_ID;
+  const env = import.meta.env.VITE_SQUARE_ENV || "production";
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    const init = async () => {
       try {
+        setStatus("loading");
+
         if (!appId || !locationId) {
-          setStatus("error");
-          setError("Missing VITE_SQUARE_APPLICATION_ID or VITE_SQUARE_LOCATION_ID (client). Rebuild after setting them.");
-          return;
+          throw new Error("Missing Square env vars");
         }
-        setStatus("sdk-loading");
-        await loadSquareSdk();
-        if (cancelled) return;
-        if (!window.Square?.payments) {
-          throw new Error("Square SDK loaded but window.Square.payments is missing.");
+
+        if (!(window as any).Square) {
+          throw new Error("Square SDK not found on window");
         }
-        setStatus("payments-creating");
-        const p = await window.Square.payments(appId, locationId);
-        if (cancelled) return;
-        setPayments(p);
-        setStatus("card-creating");
-        const c = await p.card();
-        if (cancelled) return;
-        if (!cardContainerRef.current) {
-          throw new Error("Card container not found in DOM.");
-        }
-        setStatus("card-attaching");
-        await c.attach(cardContainerRef.current);
-        if (cancelled) return;
-        setCard(c);
+
+        const payments = (window as any).Square.payments(appId, locationId);
+        const card = await payments.card();
+
+        setStatus("attaching");
+        await card.attach("#card-container");
+
+        (window as any)._squareCard = card;
         setStatus("ready");
-        console.log("[Square] ready", { env: clientEnv, appId: mask(appId), locationId: mask(locationId) });
-      } catch (e: any) {
-        const msg = e?.message || String(e);
-        let hint = "";
-        if (/not enabled|domain|origin/i.test(msg)) {
-          hint = "This origin is not allowed. Add your domain to Allowed JavaScript Origins in Square Dashboard.";
-        } else if (/location/i.test(msg)) {
-          hint = "Check that the Location ID belongs to the same app/environment and supports card processing.";
-        }
+      } catch (err) {
+        console.error("[Square] init error:", err);
         setStatus("error");
-        setError([msg, hint].filter(Boolean).join("  "));
-        console.error("[Square] init error:", e);
-        onPaymentError?.(e);
+        onPaymentError(err);
       }
-    })();
-    return () => { cancelled = true; };
-  }, [appId, locationId, clientEnv, onPaymentError]);
+    };
 
-  async function handlePay() {
-    if (!card) return;
+    init();
+  }, [onPaymentError]);
+
+  const handlePayment = async () => {
     try {
-      const result = await card.tokenize();
-      if (result?.status !== "OK" || !result?.token) {
-        throw new Error(result?.errors?.[0]?.message || "Tokenization failed");
-      }
-      const sourceId = result.token;
-      const d = normalizeDiscount(discount);
-      const createRes = await fetch("/.netlify/functions/create-square-order", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          amount_cents: amountCents,
-          items,
-          notes: notes ?? "",
-          pickup_time: pickupTime ?? "ASAP",
-          coupon: d ? { code: d.code, type: d.type, value: d.value } : null,
-        }),
-      });
-      const createJson = await createRes.json().catch(() => ({}));
-      if (!createRes.ok) throw new Error(createJson?.message || "Failed to create order");
-      const orderId = createJson.orderId || createJson.order_id || createJson.id;
-      if (!orderId) throw new Error("Order created, but no orderId returned");
-      const payRes = await fetch("/.netlify/functions/pay-square-order", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ order_id: orderId, amount_cents: amountCents, source_id: sourceId }),
-      });
-      const payJson = await payRes.json().catch(() => ({}));
-      if (!payRes.ok) throw new Error(payJson?.message || "Payment failed");
-      onPaymentSuccess?.();
-    } catch (e: any) {
-      setStatus("error");
-      setError(e?.message || "Payment failed");
-      onPaymentError?.(e);
-      console.error("[Square] payment flow error:", e);
-    }
-  }
+      setStatus("processing");
+      const card = (window as any)._squareCard;
+      if (!card) throw new Error("Card not initialized");
 
-  if (status !== "ready") {
-    return (
-      <div className="rounded border p-3 text-sm">
-        <div><strong>Square status:</strong> {status}</div>
-        {error && <div className="text-red-600 mt-1 break-words">{error}</div>}
-        <div className="text-gray-600 mt-1">
-          ENV: {String(clientEnv)} — App: {mask(appId)} — Loc: {mask(locationId)}
-        </div>
-      </div>
-    );
-  }
+      const result = await card.tokenize();
+      if (result.status !== "OK") throw new Error(result.errors);
+
+      console.log("[Square] tokenized:", result);
+
+      // TODO: send result.token to your Netlify backend
+      onPaymentSuccess(result);
+      setStatus("success");
+    } catch (err) {
+      console.error("[Square] payment error:", err);
+      setStatus("error");
+      onPaymentError(err);
+    }
+  };
 
   return (
-    <div className="space-y-3">
-      <div ref={cardContainerRef} className="border rounded p-3 min-h-[56px]" />
-      <button type="button" className="bg-black text-white px-4 py-2 rounded" onClick={handlePay}>
-        Pay {(amountCents / 100).toFixed(2)}
+    <div className="p-4 border rounded">
+      <h3 className="text-lg font-bold mb-2">Payment</h3>
+
+      {/* Debug Banner */}
+      <div className="bg-gray-100 text-xs p-2 mb-3 rounded border">
+        <div><strong>Env:</strong> {env}</div>
+        <div><strong>App ID:</strong> {mask(appId)}</div>
+        <div><strong>Location ID:</strong> {mask(locationId)}</div>
+        <div><strong>Status:</strong> {status}</div>
+      </div>
+
+      {/* Card field mounts here */}
+      <div id="card-container" className="border rounded p-3 min-h-[56px]" />
+
+      <button
+        onClick={handlePayment}
+        disabled={status !== "ready"}
+        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+      >
+        {status === "processing" ? "Processing..." : "Pay"}
       </button>
     </div>
   );
-}
+};
+
+export default SquarePaymentForm;
