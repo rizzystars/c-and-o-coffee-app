@@ -13,6 +13,11 @@ declare global {
       payments: (appId: string, locationId: string) => Promise<any>;
     };
     _squareCard?: any;
+
+    /** Optional globals you might already set elsewhere */
+    __PAY_ENDPOINT?: string;          // e.g. "/.netlify/functions/pay-square-order"
+    __ORDER_ID?: string;              // your order id if you have one
+    __TOTAL_CENTS?: number;           // total in cents
   }
 }
 
@@ -20,6 +25,39 @@ const mask = (val?: string) => {
   if (!val) return "(missing)";
   return val.slice(0, 6) + "…" + val.slice(-4);
 };
+
+/** Try to discover an amount (in cents) without changing any envs or pages.
+ *  1) window.__TOTAL_CENTS
+ *  2) an element with id="total-cents" or data-total-cents
+ *  3) a prompt (so you can quickly test a real card)
+ */
+function resolveAmountCents(): number | null {
+  if (typeof window.__TOTAL_CENTS === "number" && window.__TOTAL_CENTS > 0) {
+    return Math.round(window.__TOTAL_CENTS);
+  }
+
+  const byId = document.getElementById("total-cents");
+  if (byId && byId.textContent) {
+    const n = Number(byId.textContent.trim());
+    if (!Number.isNaN(n) && n > 0) return Math.round(n);
+  }
+
+  const dataNode = document.querySelector("[data-total-cents]") as HTMLElement | null;
+  if (dataNode) {
+    const attr = dataNode.getAttribute("data-total-cents");
+    if (attr) {
+      const n = Number(attr);
+      if (!Number.isNaN(n) && n > 0) return Math.round(n);
+    }
+  }
+
+  // Last resort: prompt for dollars so you can immediately test a live charge
+  const dollars = window.prompt("Enter amount to charge (USD, e.g. 3.18):", "3.18");
+  if (!dollars) return null;
+  const num = Number(dollars);
+  if (Number.isNaN(num) || num <= 0) return null;
+  return Math.round(num * 100);
+}
 
 const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   onPaymentSuccess,
@@ -40,6 +78,9 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       ? "https://web.squarecdn.com/v1/square.js"
       : "https://sandbox.web.squarecdn.com/v1/square.js";
 
+  // Where to POST the payment request
+  const payEndpoint = window.__PAY_ENDPOINT || "/.netlify/functions/pay-square-order";
+
   useEffect(() => {
     let cancelled = false;
 
@@ -47,17 +88,14 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       if (window.Square) return;
 
       await new Promise<void>((resolve, reject) => {
-        // Already added?
         const existing = document.querySelector(
           `script[src="${sdkUrl}"]`
         ) as HTMLScriptElement | null;
 
         if (existing) {
-          const onLoad = () => resolve();
-          const onError = () => reject(new Error("Square SDK failed to load"));
-          existing.addEventListener("load", onLoad, { once: true });
-          existing.addEventListener("error", onError, { once: true });
-          // if it already finished loading, resolve immediately
+          existing.addEventListener("load", () => resolve(), { once: true });
+          existing.addEventListener("error", () => reject(new Error("Square SDK failed to load")), { once: true });
+          // If already loaded previously:
           if ((existing as any).complete) resolve();
           return;
         }
@@ -112,7 +150,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       cancelled = true;
       try {
         window._squareCard?.destroy?.();
-      } catch {/* no-op */}
+      } catch { /* no-op */ }
       window._squareCard = undefined;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,18 +162,42 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       const card = window._squareCard;
       if (!card) throw new Error("Card not initialized");
 
+      // Tokenize the card
       const result = await card.tokenize();
       if (result.status !== "OK") {
         throw new Error(JSON.stringify(result.errors ?? "Tokenize failed"));
       }
 
-      // send result.token to your Netlify Function from here if desired
-      onPaymentSuccess(result);
+      // Figure out how much to charge (in cents) without changing your envs
+      const amountCents = resolveAmountCents();
+      if (!amountCents) {
+        throw new Error("Charge amount not provided. (No window.__TOTAL_CENTS / #total-cents / data-total-cents, and prompt canceled.)");
+      }
+
+      // Call your Netlify Function in PRODUCTION mode
+      const resp = await fetch(payEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceId: result.token,
+          amount: amountCents,
+          currency: "USD",
+          orderId: window.__ORDER_ID || undefined,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(typeof data === "string" ? data : data?.error || "Payment failed");
+      }
+
+      onPaymentSuccess(data);
       setStatus("success");
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Square] payment error:", err);
       setStatus("error");
       onPaymentError(err);
+      alert(`Payment error: ${err?.message || err}`);
     }
   };
 
@@ -166,3 +228,4 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 };
 
 export default SquarePaymentForm;
+ 
