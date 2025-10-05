@@ -292,7 +292,25 @@ const CheckoutPage: React.FC = () => {
         }}
         notes={orderNotes}
         pickupTime={pickupTime}
-        onPaymentSuccess={() => {
+        onPaymentSuccess={async () => {
+          // If a coupon was applied, mark it USED so it disappears from "Active rewards"
+          try {
+            if (coupon?.code && user?.id) {
+              await fetch("/.netlify/functions/reward-mark-used", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: coupon.code,
+                  userId: user.id,
+                  note: "Used at checkout",
+                }),
+              });
+            }
+          } catch (e) {
+            // Not fatal to the user experience
+            console.warn("reward-mark-used failed:", e);
+          }
+
           clearCart();
           navigate("/order-confirmation");
         }}
