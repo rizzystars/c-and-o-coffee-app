@@ -1,12 +1,13 @@
 [build]
-  command   = "npm run build"
-  publish   = "dist"
-  functions = "netlify/functions"
+  command = "npm run build"
+  publish = "dist"
 
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
-  # "square" has been removed from this list.
+  # Optional: keep or remove; either is fine with esbuild bundling.
   external_node_modules = ["@supabase/supabase-js"]
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
