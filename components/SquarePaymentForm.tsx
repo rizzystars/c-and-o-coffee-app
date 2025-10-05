@@ -5,19 +5,16 @@ type SquareEnv = "sandbox" | "production";
 type DiscountInfo = {
   code?: string;
   type?: "amount" | "percent";
-  value?: number;        // if 'amount', cents; if 'percent', 0–100
-  amountCents?: number;  // resolved discount in cents
+  value?: number;
+  amountCents?: number;
 };
 
 interface SquarePaymentFormProps {
-  /** Final amount in cents (after coupon, tax, tip). If provided, this wins. */
   amountCents?: number;
-  /** Optional extra context to store with the payment (not sent to Square here). */
   items?: any[];
   discount?: DiscountInfo;
   notes?: string;
   pickupTime?: string;
-
   onPaymentSuccess: (payment: any) => void;
   onPaymentError: (error: any) => void;
 }
@@ -26,9 +23,9 @@ declare global {
   interface Window {
     Square?: { payments: (appId: string, locationId: string) => Promise<any> };
     _squareCard?: any;
-    __PAY_ENDPOINT?: string;   // defaults to "/.netlify/functions/pay-square-order"
+    __PAY_ENDPOINT?: string;
     __ORDER_ID?: string;
-    __TOTAL_CENTS?: number;    // we’ll set this from amountCents if provided
+    __TOTAL_CENTS?: number;
     __LAST_PAYMENT?: any;
     __LAST_AMOUNT?: number;
   }
@@ -37,7 +34,6 @@ declare global {
 const fmtUSD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const mask = (val?: string) => (!val ? "(missing)" : val.slice(0, 6) + "…" + val.slice(-4));
 
-/** Fallback: read amount (in cents) from window or [data-total-cents] */
 function resolveAmountCentsFromDom(): number | null {
   if (typeof window.__TOTAL_CENTS === "number" && window.__TOTAL_CENTS > 0) {
     return Math.round(window.__TOTAL_CENTS);
@@ -64,6 +60,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   >("initial");
   const [confirmCents, setConfirmCents] = useState<number | null>(null);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [zip, setZip] = useState<string>("");
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,7 +74,6 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
   const payEndpoint = window.__PAY_ENDPOINT || "/.netlify/functions/pay-square-order";
 
-  // If parent passes amountCents, mirror to window so any legacy code keeps working
   useEffect(() => {
     if (typeof amountCents === "number" && amountCents > 0) {
       window.__TOTAL_CENTS = Math.round(amountCents);
@@ -116,10 +112,9 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
         const payments = await window.Square.payments(appId, locationId);
 
-        // IMPORTANT: include ZIP/Postal in the iframe
-        const card = await payments.card({ postalCode: true });
+        // IMPORTANT: DO NOT pass { postalCode: true } here — not supported by Web Payments SDK
+        const card = await payments.card();
 
-        await Promise.resolve();
         const el = containerRef.current;
         if (!el) throw new Error("Card container ref is null");
 
@@ -155,7 +150,6 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId, locationId, env]);
 
-  /** First click: open confirm modal with resolved amount */
   const handleBeginPay = () => {
     const cents =
       typeof amountCents === "number" && amountCents > 0
@@ -173,7 +167,6 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
     setStatus("confirm");
   };
 
-  /** Second click: tokenize & charge */
   const handleConfirmPay = async () => {
     try {
       setStatus("processing");
@@ -182,13 +175,15 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       const card = window._squareCard;
       if (!card) throw new Error("Card not initialized");
 
-      const tok = await card.tokenize();
+      // Pass ZIP (postal code) via billingDetails if provided
+      const billingDetails = zip ? { postalCode: zip.trim() } : undefined;
+
+      const tok = await card.tokenize({ billingDetails } as any);
       if (tok.status !== "OK") {
         const msg = (tok.errors || []).map((e: any) => e.message).join(" · ") || "Tokenize failed";
         throw new Error(msg);
       }
 
-      // Build server payload (you can extend later with items/notes if your function supports them)
       const payload: Record<string, any> = {
         sourceId: tok.token,
         amount: confirmCents,
@@ -205,11 +200,10 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       const data = await resp.json();
       if (!resp.ok) throw new Error(typeof data === "string" ? data : data?.error || "Payment failed");
 
-      // Success: notify + persist for receipt page
       onPaymentSuccess(data);
+
       try {
         const toStore = (data?.payment ?? data) || {};
-        // attach lightweight context for your receipt if you want
         (toStore as any).__clientNotes = notes;
         (toStore as any).__pickupTime = pickupTime;
         (toStore as any).__discount = discount;
@@ -219,12 +213,13 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
           price: i?.menuItem?.price,
         }));
         sessionStorage.setItem("lastPayment", JSON.stringify(toStore));
-      } catch { /* no-op */ }
+      } catch {}
+
       window.__LAST_PAYMENT = data?.payment ?? data;
       window.__LAST_AMOUNT = (confirmCents ?? 0) / 100;
 
       setStatus("success");
-      // NOTE: We DO NOT redirect here; your CheckoutPage's onPaymentSuccess already navigates.
+      // No redirect here; your CheckoutPage navigates on success.
     } catch (err: any) {
       console.error("[Square] payment error:", err);
       setStatus("ready");
@@ -247,6 +242,19 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
       {/* Card field */}
       <div ref={containerRef} id="card-container" className="border rounded p-3 min-h-[56px]" />
+
+      {/* Optional ZIP input you control */}
+      <div className="mt-3 flex items-center gap-2">
+        <label className="text-sm text-gray-700 w-24">ZIP / Postal</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={zip}
+          onChange={(e) => setZip(e.target.value)}
+          className="border rounded p-2 flex-1"
+          placeholder="e.g., 94103"
+        />
+      </div>
 
       {cardError && <p className="mt-2 text-sm text-red-600">{cardError}</p>}
 
