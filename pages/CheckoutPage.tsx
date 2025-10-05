@@ -52,6 +52,7 @@ const CheckoutPage: React.FC = () => {
   const [orderNotes, setOrderNotes] = useState("");
   const [pickupTime, setPickupTime] = useState("ASAP");
   const [tipPercent, setTipPercent] = useState(0);
+  const [billingZip, setBillingZip] = useState(""); // optional, passed to Square
 
   const cart = Array.isArray(items) ? items : [];
 
@@ -84,18 +85,16 @@ const CheckoutPage: React.FC = () => {
   }
 
   // === Totals ===
-  // subtotal in dollars (from cart)
   const subtotal = cart.reduce(
     (sum, item) => sum + normalizePrice(item.menuItem?.price) * (item.quantity || 1),
     0
   );
   const subtotalCents = dollarsToCents(subtotal);
 
-  // discount based on current subtotal + applied coupon
   const discountCents = calcDiscountCents(subtotalCents, coupon);
   const discount = centsToDollars(discountCents);
 
-  const tip = subtotal * (tipPercent / 100); // you can switch to cents similarly if you prefer
+  const tip = subtotal * (tipPercent / 100);
   const tax = (subtotal - discount + tip) * (TAX_PERCENT / 100);
   const total = subtotal - discount + tip + tax;
   const totalCents = dollarsToCents(total);
@@ -105,11 +104,12 @@ const CheckoutPage: React.FC = () => {
     e.preventDefault();
     setCouponError("");
     try {
+      if (!couponCode.trim()) return;
       const res = await fetch("/.netlify/functions/coupon-validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // DO NOT uppercase; backend is case-insensitive already (.ilike)
-        body: JSON.stringify({ code: couponCode.trim() }),
+        // Server is case-insensitive; include subtotal for min-subtotal checks
+        body: JSON.stringify({ code: couponCode.trim(), subtotal_cents: subtotalCents }),
       });
       const data = await res.json();
 
@@ -119,7 +119,6 @@ const CheckoutPage: React.FC = () => {
         return;
       }
 
-      // Normalize to our expected shape
       const normalized: CouponClient = {
         code: data.code,
         discount_type: data.discount_type,
@@ -128,13 +127,13 @@ const CheckoutPage: React.FC = () => {
       };
       setCoupon(normalized);
 
-      // Friendly label (for UI line item)
       const label =
         normalized.discount_type === "amount"
           ? `Coupon ${normalized.code} (-$${(normalized.discount_value / 100).toFixed(2)})`
           : `Coupon ${normalized.code} (-${normalized.discount_value}% )`;
 
       toast.success(`Coupon applied: ${label}`);
+      setCouponCode("");
     } catch (err: any) {
       console.error(err);
       setCoupon(null);
@@ -142,8 +141,15 @@ const CheckoutPage: React.FC = () => {
     }
   }
 
+  function removeCoupon() {
+    setCoupon(null);
+    setCouponError("");
+    toast("Coupon removed", { icon: "🧾" });
+  }
+
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    // data-total-cents helps SquarePaymentForm fallback logic if needed
+    <div className="max-w-3xl mx-auto p-6" data-total-cents={totalCents}>
       <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
       {/* Order Summary */}
@@ -191,19 +197,33 @@ const CheckoutPage: React.FC = () => {
       </div>
 
       {/* Coupon Form */}
-      <form onSubmit={applyCoupon} className="mb-6">
+      <form onSubmit={applyCoupon} className="mb-6 flex items-start gap-2">
         <input
           type="text"
           placeholder="Coupon code"
           value={couponCode}
           onChange={(e) => setCouponCode(e.target.value)}
-          className="border p-2 rounded mr-2"
+          className="border p-2 rounded grow"
         />
-        <button type="submit" className="bg-gray-700 text-white px-4 py-2 rounded">
+        <button
+          type="submit"
+          disabled={!couponCode.trim()}
+          className="bg-gray-700 text-white px-4 py-2 rounded disabled:opacity-50"
+        >
           Apply
         </button>
-        {couponError && <p className="text-red-600 mt-1">{couponError}</p>}
+        {coupon && (
+          <button
+            type="button"
+            onClick={removeCoupon}
+            className="px-4 py-2 rounded border"
+            aria-label="Remove coupon"
+          >
+            Remove
+          </button>
+        )}
       </form>
+      {couponError && <p className="text-red-600 -mt-4 mb-6">{couponError}</p>}
 
       {/* Tip selection */}
       <div className="mb-6">
@@ -246,12 +266,25 @@ const CheckoutPage: React.FC = () => {
         />
       </div>
 
+      {/* Optional Billing ZIP (passed into SquarePaymentForm) */}
+      <div className="mb-6 max-w-sm">
+        <label className="block font-semibold mb-1">Billing ZIP (optional)</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={billingZip}
+          onChange={(e) => setBillingZip(e.target.value)}
+          className="w-full border p-2 rounded"
+          placeholder="e.g., 94103"
+        />
+      </div>
+
       {/* Payment */}
       <SquarePaymentForm
-        amountCents={totalCents}          // already discounted + tax + tip
+        amountCents={totalCents} // already discounted + tax + tip
+        postalCode={billingZip || undefined}
         items={cart}
         discount={{
-          // optional prop if your SquarePaymentForm uses it
           code: coupon?.code,
           type: coupon?.discount_type,
           value: coupon?.discount_value,

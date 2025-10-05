@@ -39,7 +39,6 @@ declare global {
 }
 
 const fmtUSD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const mask = (val?: string) => (!val ? "(missing)" : val.slice(0, 6) + "…" + val.slice(-4));
 
 /** Fallback: read amount (in cents) from window or [data-total-cents] */
 function resolveAmountCentsFromDom(): number | null {
@@ -243,14 +242,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
     <div className="p-4 border rounded relative">
       <h3 className="text-lg font-bold mb-2">Payment</h3>
 
-      {/* Debug Banner */}
-      <div className="bg-gray-100 text-xs p-2 mb-3 rounded border">
-        <div><strong>Env:</strong> {env}</div>
-        <div><strong>App ID:</strong> {mask(appId)}</div>
-        <div><strong>Location ID:</strong> {mask(locationId)}</div>
-        <div><strong>Status:</strong> {status}</div>
-      </div>
-
+      
       {/* Card field */}
       <div ref={containerRef} id="card-container" className="border rounded p-3 min-h-[56px]" />
 
