@@ -10,11 +10,18 @@ type DiscountInfo = {
 };
 
 interface SquarePaymentFormProps {
+  /** Final amount in cents (after coupon, tax, tip). */
   amountCents?: number;
+
+  /** Optional: pass a single billing ZIP from your page. If omitted, none is used. */
+  postalCode?: string;
+
+  /** Optional context for your receipt page (not sent to Square here). */
   items?: any[];
   discount?: DiscountInfo;
   notes?: string;
   pickupTime?: string;
+
   onPaymentSuccess: (payment: any) => void;
   onPaymentError: (error: any) => void;
 }
@@ -34,6 +41,7 @@ declare global {
 const fmtUSD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const mask = (val?: string) => (!val ? "(missing)" : val.slice(0, 6) + "…" + val.slice(-4));
 
+/** Fallback: read amount (in cents) from window or [data-total-cents] */
 function resolveAmountCentsFromDom(): number | null {
   if (typeof window.__TOTAL_CENTS === "number" && window.__TOTAL_CENTS > 0) {
     return Math.round(window.__TOTAL_CENTS);
@@ -48,6 +56,7 @@ function resolveAmountCentsFromDom(): number | null {
 
 const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   amountCents,
+  postalCode,         // <- optional, supplied by the page if you want
   items,
   discount,
   notes,
@@ -60,7 +69,6 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
   >("initial");
   const [confirmCents, setConfirmCents] = useState<number | null>(null);
   const [cardError, setCardError] = useState<string | null>(null);
-  const [zip, setZip] = useState<string>("");
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -74,6 +82,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
   const payEndpoint = window.__PAY_ENDPOINT || "/.netlify/functions/pay-square-order";
 
+  // Mirror amount to window for any legacy code using __TOTAL_CENTS
   useEffect(() => {
     if (typeof amountCents === "number" && amountCents > 0) {
       window.__TOTAL_CENTS = Math.round(amountCents);
@@ -112,7 +121,7 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
         const payments = await window.Square.payments(appId, locationId);
 
-        // IMPORTANT: DO NOT pass { postalCode: true } here — not supported by Web Payments SDK
+        // Create the card element (no postalCode option here; not supported)
         const card = await payments.card();
 
         const el = containerRef.current;
@@ -175,10 +184,12 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
       const card = window._squareCard;
       if (!card) throw new Error("Card not initialized");
 
-      // Pass ZIP (postal code) via billingDetails if provided
-      const billingDetails = zip ? { postalCode: zip.trim() } : undefined;
+      // Only pass billingDetails if the page gave us a postalCode
+      const billingDetails = postalCode?.trim()
+        ? ({ postalCode: postalCode.trim() } as any)
+        : undefined;
 
-      const tok = await card.tokenize({ billingDetails } as any);
+      const tok = await card.tokenize(billingDetails ? { billingDetails } : undefined);
       if (tok.status !== "OK") {
         const msg = (tok.errors || []).map((e: any) => e.message).join(" · ") || "Tokenize failed";
         throw new Error(msg);
@@ -242,19 +253,6 @@ const SquarePaymentForm: React.FC<SquarePaymentFormProps> = ({
 
       {/* Card field */}
       <div ref={containerRef} id="card-container" className="border rounded p-3 min-h-[56px]" />
-
-      {/* Optional ZIP input you control */}
-      <div className="mt-3 flex items-center gap-2">
-        <label className="text-sm text-gray-700 w-24">ZIP / Postal</label>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={zip}
-          onChange={(e) => setZip(e.target.value)}
-          className="border rounded p-2 flex-1"
-          placeholder="e.g., 94103"
-        />
-      </div>
 
       {cardError && <p className="mt-2 text-sm text-red-600">{cardError}</p>}
 
