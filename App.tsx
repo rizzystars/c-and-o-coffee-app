@@ -15,6 +15,7 @@ import PersonalInfoPage from './pages/PersonalInfoPage';
 import PrivacyPage from './pages/PrivacyPage';
 import Reset from './pages/Reset';
 import UpdatePassword from './pages/UpdatePassword';
+import OrderConfirmationPage from './pages/OrderConfirmationPage'; // <-- NEW
 import CartDrawer from './components/CartDrawer';
 import { Toaster } from 'react-hot-toast';
 import { supabase } from './lib/supabaseClient';
@@ -25,32 +26,23 @@ const App: React.FC = () => {
     // This effect hook handles the Supabase authentication state changes.
     // It's placed in the top-level App component to ensure it runs once
     // when the application loads.
-    
-    // Guard against the case where the Supabase client might not be initialized
-    // (e.g., missing environment variables).
+
     if (!supabase) {
       console.error("Supabase client is not available. Authentication will not work.");
-      // Set loading to false so the app doesn't hang in a loading state.
       useAuthStore.setState({ isLoading: false });
       return;
     }
 
-    // `onAuthStateChange` returns a subscription object. We capture it here
-    // so we can unsubscribe later, preventing memory leaks.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        // This callback is triggered on sign-in, sign-out, and token refresh.
-        // We delegate the state update logic to our Zustand store.
         useAuthStore.getState().setUserAndFetchData(session);
       }
     );
 
-    // The cleanup function for the useEffect hook.
-    // React will call this when the component unmounts.
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []); // The empty dependency array ensures this effect runs only once on mount.
+  }, []);
 
   return (
     <HashRouter>
@@ -71,6 +63,8 @@ const App: React.FC = () => {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/account/info" element={<PersonalInfoPage />} />
             <Route path="/account/privacy" element={<PrivacyPage />} />
+            {/* NEW: standard receipt page after successful Square payment */}
+            <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
           </Routes>
         </main>
         <Footer />
