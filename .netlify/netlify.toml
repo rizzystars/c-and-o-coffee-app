@@ -1,15 +1,15 @@
-functionsDirectory = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\netlify\\functions"
+functionsDirectory = "C:\\Users\\mixed\\c-and-o-coffee-app\\netlify\\functions"
 functionsDirectoryOrigin = "config"
 redirectsOrigin = "config"
 plugins = []
 headers = []
 
 [build]
-publish = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\dist"
+publish = "C:\\Users\\mixed\\c-and-o-coffee-app\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
 command = "npm run build"
-functions = "C:\\Users\\mixed\\Downloads\\cno_loyalty_redeem_viewsafe_COUPON_AUTOMARK_TEXTWHITE\\netlify\\functions"
+functions = "C:\\Users\\mixed\\c-and-o-coffee-app\\netlify\\functions"
 
 [build.environment]
 

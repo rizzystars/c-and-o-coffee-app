@@ -1,0 +1,35 @@
+﻿/* Homepage-specific background */
+html, body {
+  height: 100%;
+}
+
+body.home-hero {
+  background-image: url('/cappuccino-crew.png') !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+/* Let the art show through on the homepage */
+body.home-hero main,
+body.home-hero main * {
+  background: transparent !important;
+}
+
+/* The wrapper div uses Tailwind's bg-white — clear it on the homepage */
+body.home-hero .bg-white {
+  background-color: transparent !important;
+}
+
+/* Also clear any root wrappers just in case */
+body.home-hero #root,
+body.home-hero #root > div {
+  background: transparent !important;
+}
+
+/* Keep header solid */
+header {
+  background-color: #000 !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+}

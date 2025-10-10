@@ -1,0 +1,74 @@
+﻿/* Homepage-specific background */
+body.home-hero {
+  background-image: url('/cappuccino-crew.png') !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+/* On the homepage, make page content transparent so the art shows */
+body.home-hero main,
+body.home-hero main * {
+  background: transparent !important;
+}
+
+/* Header stays opaque/clean on all pages */
+header {
+  background-color: #000 !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ───────── Auth pages: solid black, no image ───────── */
+body.auth {
+  background-color: #000 !important;
+  background-image: none !important;
+  background-attachment: initial !important;
+  background-repeat: no-repeat !important;
+  background-position: initial !important;
+  background-size: auto !important;
+}
+
+/* Keep page content transparent so the auth card art shows */
+body.auth main,
+body.auth main * {
+  background: transparent !important;
+}
+
+/* Kill any pseudo-element backgrounds */
+body.auth::before,
+body.auth::after {
+  content: none !important;
+  background: none !important;
+  background-image: none !important;
+}
+
+/* In case a container had a bg-image */
+body.auth #root,
+body.auth main {
+  background-image: none !important;
+}
+
+/* ───────── Glassy auth card ───────── */
+.auth-card {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.08)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  outline: 1px solid rgba(255, 255, 255, 0.06); /* faint inner divider */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px) saturate(110%);
+  -webkit-backdrop-filter: blur(10px) saturate(110%);
+  border-radius: 1rem; /* rounded-2xl feel */
+}
+
+/* Keep inputs/buttons solid so they’re readable & on-brand */
+.auth-card input,
+.auth-card select,
+.auth-card textarea {
+  background: #fff;
+  color: #0A2540; /* navy */
+}
+.auth-card button { /* leave actual btn styles in JSX as needed */ }

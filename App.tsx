@@ -1,54 +1,108 @@
-import React, { useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
-import Header from './components/Header';
-import Footer from './components/Footer';
-import HomePage from './pages/HomePage';
-import MenuPage from './pages/MenuPage';
-import CheckoutPage from './pages/CheckoutPage';
-import AccountPage from './pages/AccountPage';
-import LocationPage from './pages/LocationPage';
-import ConfirmationPage from './pages/ConfirmationPage';
-import LoginPage from './pages/LoginPage';
-import RewardsPage from './pages/RewardsPage';
-import HistoryPage from './pages/HistoryPage';
-import PersonalInfoPage from './pages/PersonalInfoPage';
-import PrivacyPage from './pages/PrivacyPage';
-import Reset from './pages/Reset';
-import UpdatePassword from './pages/UpdatePassword';
-import OrderConfirmationPage from './pages/OrderConfirmationPage'; // <-- NEW
-import CartDrawer from './components/CartDrawer';
-import { Toaster } from 'react-hot-toast';
-import { supabase } from './lib/supabaseClient';
-import { useAuthStore } from './hooks/useAuthStore';
+﻿// App.tsx
+import { useEffect } from "react";
+import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
 
-const App: React.FC = () => {
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import CartDrawer from "./components/CartDrawer";
+
+import HomePage from "./pages/HomePage";
+import MenuPage from "./pages/MenuPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import AccountPage from "./pages/AccountPage";
+import LocationPage from "./pages/LocationPage";
+import ConfirmationPage from "./pages/ConfirmationPage";
+import LoginPage from "./pages/LoginPage";
+import RewardsPage from "./pages/RewardsPage";
+import HistoryPage from "./pages/HistoryPage";
+import PersonalInfoPage from "./pages/PersonalInfoPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import Reset from "./pages/Reset";
+import UpdatePassword from "./pages/UpdatePassword";
+import OrderConfirmationPage from "./pages/OrderConfirmationPage";
+
+import { Toaster } from "react-hot-toast";
+import { supabase } from "./lib/supabaseClient";
+import { useAuthStore } from "./hooks/useAuthStore";
+
+// keep overrides last so it wins the cascade
+import "./styles/app-overrides.css";
+
+/** Adds/removes 'home-hero' or 'auth' on <body> based on the route */
+function BodyClassController() {
+  const location = useLocation();
+
   useEffect(() => {
-    // This effect hook handles the Supabase authentication state changes.
-    // It's placed in the top-level App component to ensure it runs once
-    // when the application loads.
+    const path =
+      location.pathname || (window.location.hash.replace(/^#/, "") || "/");
 
-    if (!supabase) {
-      console.error("Supabase client is not available. Authentication will not work.");
-      useAuthStore.setState({ isLoading: false });
-      return;
+    const onHome =
+      path === "/" ||
+      window.location.hash === "#/" ||
+      window.location.hash === "";
+
+    const onAuth =
+      path.startsWith("/login") ||
+      path.startsWith("/signup") ||
+      path.startsWith("/reset") ||
+      path.startsWith("/update-password");
+
+    // Toggle classes
+    document.body.classList.toggle("home-hero", onHome);
+    document.body.classList.toggle("auth", onAuth);
+
+    // Inline nuke for auth pages
+    if (onAuth) {
+      document.body.style.background = "#000";
+      document.body.style.backgroundImage = "none";
+      document.body.style.backgroundColor = "#000";
+    } else {
+      document.body.style.removeProperty("background");
+      document.body.style.removeProperty("background-image");
+      document.body.style.removeProperty("background-color");
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    // cleanup
+    return () => {
+      document.body.classList.remove("home-hero");
+      document.body.classList.remove("auth");
+      document.body.style.removeProperty("background");
+      document.body.style.removeProperty("background-image");
+      document.body.style.removeProperty("background-color");
+    };
+  }, [location]);
+
+  return null;
+}
+
+const App: React.FC = () => {
+  // auth listener — use the correct store method defensively
+  useEffect(() => {
+    const store = useAuthStore.getState() as any;
+    const setUserAndFetchData =
+      typeof store.setUserAndFetchData === "function"
+        ? store.setUserAndFetchData
+        : () => {};
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) setUserAndFetchData(data.session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        useAuthStore.getState().setUserAndFetchData(session);
+        setUserAndFetchData(session ?? null);
       }
     );
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => listener?.subscription?.unsubscribe?.();
   }, []);
 
   return (
     <HashRouter>
+      <BodyClassController />
       <div className="flex flex-col min-h-screen font-sans bg-white text-navy">
         <Header />
-        <main className="flex-grow">
+        <main className="flex-grow min-h-screen">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/menu" element={<MenuPage />} />
@@ -57,14 +111,14 @@ const App: React.FC = () => {
             <Route path="/location" element={<LocationPage />} />
             <Route path="/confirmation/:orderId" element={<ConfirmationPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<LoginPage />} /> {/* swap to <SignupPage /> if you split it */}
             <Route path="/reset" element={<Reset />} />
             <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/rewards" element={<RewardsPage />} />
             <Route path="/history" element={<HistoryPage />} />
-            <Route path="/account/info" element={<PersonalInfoPage />} />
-            <Route path="/account/privacy" element={<PrivacyPage />} />
-            {/* NEW: standard receipt page after successful Square payment */}
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/personal-info" element={<PersonalInfoPage />} />
           </Routes>
         </main>
         <Footer />

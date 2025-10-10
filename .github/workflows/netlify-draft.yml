@@ -1,0 +1,20 @@
+﻿name: netlify-draft
+on:
+  push:
+    branches: ['**']   # runs on any branch (cheap drafts)
+  pull_request:
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm i -g netlify-cli
+      - name: Deploy draft to Netlify
+        run: netlify deploy --dir=dist --message "draft ${{ github.ref_name }}@${{ github.sha }}" --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }}
