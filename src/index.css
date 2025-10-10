@@ -1,0 +1,21 @@
+﻿html, body, #root { height: 100%; }
+/* replaced: body.home-hero background */
+body.home-hero main,
+body.home-hero main * {
+  background: transparent !important;
+}
+
+body.home-hero::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url('/cappuccino-crew.png') center / cover no-repeat;
+  z-index: -1;              /* behind all content */
+  will-change: transform;   /* keeps it smooth */
+}
+
+/* Make page content transparent so bg shows through */
+body.home-hero main,
+body.home-hero main * {
+  background: transparent !important;
+}

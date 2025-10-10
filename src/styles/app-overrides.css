@@ -1,10 +1,5 @@
 ﻿/* Homepage-specific background */
-body.home-hero {
-  background-image: url('/cappuccino-crew.png') !important;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-}
+/* removed duplicate body.home-hero (handled via fixed layer) */
 
 /* On the homepage, make page content transparent so the art shows */
 body.home-hero main,
@@ -72,3 +67,4 @@ body.auth main {
   color: #0A2540; /* navy */
 }
 .auth-card button { /* leave actual btn styles in JSX as needed */ }
+
