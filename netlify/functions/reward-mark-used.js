@@ -1,4 +1,4 @@
-// netlify/functions/reward-mark-used.js
+﻿// netlify/functions/reward-mark-used.js
 // Marks a reward code as USED for a user. Supports dry-run via header "X-Dry-Run: 1".
 // Requires server env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Optional: CORS_ORIGIN (defaults to "*")
@@ -20,7 +20,7 @@ function json(status, body) {
   };
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   try {
     // CORS preflight
     if (event.httpMethod === "OPTIONS") {
@@ -119,3 +119,4 @@ exports.handler = async (event) => {
     return json(500, { error: e?.message || "Unknown server error" });
   }
 };
+

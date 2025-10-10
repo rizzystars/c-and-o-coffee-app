@@ -1,11 +1,11 @@
-// netlify/functions/pay-square-order.js
+﻿// netlify/functions/pay-square-order.js
 // Charges a card using Square's Payments API (REST, no SDK).
 // Defaults to PRODUCTION if SQUARE_ENV is unset. Requires SQUARE_ACCESS_TOKEN in Netlify env.
 // Optional envs: SQUARE_ENV ("production" or "sandbox"), SQUARE_LOCATION_ID
 
 const crypto = require("crypto");
 
-exports.handler = async function (event) {
+export async function handler(event) {
   try {
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };
@@ -92,3 +92,4 @@ function json(statusCode, obj) {
     body: JSON.stringify(obj),
   };
 }
+
