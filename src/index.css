@@ -1,18 +1,11 @@
-﻿html, body, #root { height: 100%; }
+html, body, #root { height: 100%; }
 /* replaced: body.home-hero background */
 body.home-hero main,
 body.home-hero main * {
   background: transparent !important;
 }
 
-body.home-hero::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: url('/cappuccino-crew.png') center / cover no-repeat;
-  z-index: -1;              /* behind all content */
-  will-change: transform;   /* keeps it smooth */
-}
+/* removed: duplicate hero pseudo-element */
 
 /* Make page content transparent so bg shows through */
 body.home-hero main,
@@ -21,22 +14,11 @@ body.home-hero main * {
 }
 
 /* Fixed homepage background */
-#home-fixed-bg {
-  position: fixed;
-  inset: 0;
-  background: url('/cappuccino-crew.png') center / cover no-repeat;
-  z-index: -1;
-  pointer-events: none;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity .25s ease;
-  transform: translateZ(0);
-  will-change: opacity;
-}
-body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
+/* removed: fixed bg moved to app-overrides.css */
+body.home-hero /* removed: fixed bg moved to app-overrides.css */
 header { background-color: #000 !important; background-image: none !important; backdrop-filter: none !important; }
 body.home-hero main, body.home-hero main * { background: transparent !important; }
-@media (prefers-reduced-data: reduce) { #home-fixed-bg { background-image: none; background-color: #000; } }
+@media (prefers-reduced-data: reduce) { /* removed: fixed bg moved to app-overrides.css */ }
 
 /* --- Mobile base --- */
 html, body { height: 100%; -webkit-text-size-adjust: 100%; }
@@ -48,7 +30,7 @@ main { padding-bottom: calc(12px + var(--safe-bottom)); }
 button, .btn, .nav-link, .icon-btn { min-height: 44px; min-width: 44px; }
 input, select, textarea { font-size: 16px; }
 .scroller { -webkit-overflow-scrolling: touch; overflow-y: auto; }
-#home-fixed-bg { position: fixed; inset: 0; background: url('/cappuccino-crew.png') center/cover no-repeat; z-index:-1; pointer-events:none; visibility:hidden; opacity:0; transition:opacity .25s ease; transform: translateZ(0); will-change: opacity; }
-body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
-@media (max-width: 640px) { body.home-hero #home-fixed-bg { background-image: url('/cappuccino-crew@1280.webp'), url('/cappuccino-crew@1280.jpg'); background-position: center 40%; } }
-@media (max-width: 1024px) and (min-width: 641px) { body.home-hero #home-fixed-bg { background-image: url('/cappuccino-crew@1920.webp'), url('/cappuccino-crew@1920.jpg'); } }
+/* removed: fixed bg moved to app-overrides.css */
+body.home-hero /* removed: fixed bg moved to app-overrides.css */
+@media (max-width: 640px) { body.home-hero /* removed: fixed bg moved to app-overrides.css */ }
+@media (max-width: 1024px) and (min-width: 641px) { body.home-hero /* removed: fixed bg moved to app-overrides.css */ }

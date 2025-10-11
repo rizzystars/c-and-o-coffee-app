@@ -1,4 +1,4 @@
-﻿/* Homepage-specific background */
+/* Homepage-specific background */
 /* removed duplicate body.home-hero (handled via fixed layer) */
 
 /* On the homepage, make page content transparent so the art shows */
@@ -14,7 +14,7 @@ header {
   backdrop-filter: none !important;
 }
 
-/* ───────── Auth pages: solid black, no image ───────── */
+/* --------- Auth pages: solid black, no image --------- */
 body.auth {
   background-color: #000 !important;
   background-image: none !important;
@@ -44,7 +44,7 @@ body.auth main {
   background-image: none !important;
 }
 
-/* ───────── Glassy auth card ───────── */
+/* --------- Glassy auth card --------- */
 .auth-card {
   background: linear-gradient(
     to bottom,
@@ -59,7 +59,7 @@ body.auth main {
   border-radius: 1rem; /* rounded-2xl feel */
 }
 
-/* Keep inputs/buttons solid so they’re readable & on-brand */
+/* Keep inputs/buttons solid so they�re readable & on-brand */
 .auth-card input,
 .auth-card select,
 .auth-card textarea {
@@ -70,53 +70,26 @@ body.auth main {
 
 
 /* Fixed homepage background */
-#home-fixed-bg {
-  position: fixed;
-  inset: 0;
-  background: url('/cappuccino-crew.png') center / cover no-repeat;
-  z-index: -1;
-  pointer-events: none;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity .25s ease;
-  transform: translateZ(0);
-  will-change: opacity;
-}
-body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
+
+body.home-hero 
 header { background-color: #000 !important; background-image: none !important; backdrop-filter: none !important; }
 body.home-hero main, body.home-hero main * { background: transparent !important; }
-@media (prefers-reduced-data: reduce) { #home-fixed-bg { background-image: none; background-color: #000; } }
+@media (prefers-reduced-data: reduce) {  }
 
 /* === C&O: Homepage fixed background (do not remove) === */
-body.home-hero #home-fixed-bg {
-  background-size: cover;
-  background-position: center 20%;
-  background-repeat: no-repeat;
-  background-image: url('/cappuccino-crew.png');
-}
+body.home-hero 
 
 
 
- /* === C&O: Homepage fixed bg — force full-bleed, no duplicates === */
+ /* === C&O: Homepage fixed bg � force full-bleed, no duplicates === */
 body.home-hero { 
   background: none !important;  /* kill any other body background */
 }
 
-body.home-hero #home-fixed-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-
-  /* USE THE WIDESCREEN FILE */
-  background: url('/cappuccino-crew_2560.webp') center 20% / cover no-repeat !important;
-
-  transform: translateZ(0);
-  will-change: opacity;
-}
+body.home-hero 
 
 
-/* === C&O: HARD OVERRIDES — enforce single fixed hero background === */
+/* === C&O: HARD OVERRIDES � enforce single fixed hero background === */
 html, body, #root {
   background: none !important;
 }
@@ -129,12 +102,30 @@ body.home-hero .wrapper {
 }
 
 /* highest specificity fixed background */
-html body.home-hero #home-fixed-bg {
+html body.home-hero
+  
+/* === Canonical homepage fixed background (single source of truth) === */
+body.home-hero #home-fixed-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: url('/cappuccino-crew_2560.webp') center 20% / cover no-repeat !important;
   transform: translateZ(0);
+  will-change: opacity;
+  background: url('/cappuccino-crew.png') center 20% / cover no-repeat !important;
 }
 
+/* Clear any other backgrounds on the home route */
+body.home-hero,
+body.home-hero #root,
+body.home-hero .App,
+body.home-hero .wrapper,
+body.home-hero .page,
+body.home-hero .hero {
+  background: none !important;
+  background-image: none !important;
+}
+body.home-hero main,
+body.home-hero main * {
+  background: transparent !important;
+}
