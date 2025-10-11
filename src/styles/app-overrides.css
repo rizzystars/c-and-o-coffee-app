@@ -86,3 +86,12 @@ body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
 header { background-color: #000 !important; background-image: none !important; backdrop-filter: none !important; }
 body.home-hero main, body.home-hero main * { background: transparent !important; }
 @media (prefers-reduced-data: reduce) { #home-fixed-bg { background-image: none; background-color: #000; } }
+
+/* === C&O: Homepage fixed background (do not remove) === */
+body.home-hero #home-fixed-bg {
+  background-size: cover;
+  background-position: center 20%;
+  background-repeat: no-repeat;
+  background-image: url('/cappuccino-crew.png');
+}
+
