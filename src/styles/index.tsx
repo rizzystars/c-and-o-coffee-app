@@ -1,4 +1,5 @@
-﻿initHomeHeroRouteListener();
+﻿import './app-overrides.css';
+initHomeHeroRouteListener();
 import { initHomeHeroRouteListener } from '../route-home-hero';
 import './route-home-hero';
 import './index.css';
@@ -21,6 +22,7 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
 
 
 

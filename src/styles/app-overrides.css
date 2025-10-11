@@ -96,3 +96,22 @@ body.home-hero #home-fixed-bg {
 }
 
 
+
+ /* === C&O: Homepage fixed bg — force full-bleed, no duplicates === */
+body.home-hero { 
+  background: none !important;  /* kill any other body background */
+}
+
+body.home-hero #home-fixed-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  /* USE THE WIDESCREEN FILE */
+  background: url('/cappuccino-crew_2560.webp') center 20% / cover no-repeat !important;
+
+  transform: translateZ(0);
+  will-change: opacity;
+}
+
