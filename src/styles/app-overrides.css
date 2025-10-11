@@ -68,3 +68,21 @@ body.auth main {
 }
 .auth-card button { /* leave actual btn styles in JSX as needed */ }
 
+
+/* Fixed homepage background */
+#home-fixed-bg {
+  position: fixed;
+  inset: 0;
+  background: url('/cappuccino-crew.png') center / cover no-repeat;
+  z-index: -1;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .25s ease;
+  transform: translateZ(0);
+  will-change: opacity;
+}
+body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
+header { background-color: #000 !important; background-image: none !important; backdrop-filter: none !important; }
+body.home-hero main, body.home-hero main * { background: transparent !important; }
+@media (prefers-reduced-data: reduce) { #home-fixed-bg { background-image: none; background-color: #000; } }

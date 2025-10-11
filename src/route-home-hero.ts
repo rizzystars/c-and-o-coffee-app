@@ -1,11 +1,15 @@
-﻿function applyHomeHero() {
-  // HashRouter home is '#/' (treat '' and '#' as home too just in case)
-  const h = window.location.hash || '#/';
-  const onHome = h === '#/' || h === '' || h === '#';
-  document.body.classList.toggle('home-hero', onHome);
+﻿function isHome(): boolean {
+  return location.hash === '' || location.hash === '#/' || location.hash === '#';
 }
-// Run once on load
-applyHomeHero();
-// Keep it in sync as the hash changes
-window.addEventListener('hashchange', applyHomeHero);
-window.addEventListener('popstate', applyHomeHero);
+function apply() {
+  if (isHome()) {
+    document.body.classList.add('home-hero');
+  } else {
+    document.body.classList.remove('home-hero');
+  }
+}
+export function initHomeHeroRouteListener() {
+  apply();
+  window.addEventListener('hashchange', apply);
+  window.addEventListener('popstate', apply);
+}
