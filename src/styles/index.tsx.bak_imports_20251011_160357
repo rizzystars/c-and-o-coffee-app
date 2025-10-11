@@ -1,5 +1,8 @@
-﻿import './index.css';
-import './src/home-hero-init';
+﻿import './app-overrides.css';
+initHomeHeroRouteListener();
+import { initHomeHeroRouteListener } from '../route-home-hero';
+import './route-home-hero';
+import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -19,5 +22,7 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+
 
 

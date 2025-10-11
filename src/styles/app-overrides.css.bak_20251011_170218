@@ -1,4 +1,4 @@
-ï»¿/* Homepage-specific background */
+/* Homepage-specific background */
 /* removed duplicate body.home-hero (handled via fixed layer) */
 
 /* On the homepage, make page content transparent so the art shows */
@@ -20,7 +20,7 @@ body.auth {
   background-image: none !important;
   background-attachment: initial !important;
   background-repeat: no-repeat !important;
-  background-position: center calc(50% + 64px) !important;
+  background-position: initial !important;
   background-size: auto !important;
 }
 
@@ -59,7 +59,7 @@ body.auth main {
   border-radius: 1rem; /* rounded-2xl feel */
 }
 
-/* Keep inputs/buttons solid so theyâ€™re readable & on-brand */
+/* Keep inputs/buttons solid so they’re readable & on-brand */
 .auth-card input,
 .auth-card select,
 .auth-card textarea {
@@ -81,13 +81,15 @@ body.home-hero
 
 
 
- /* === C&O: Homepage fixed bg â€” force full-bleed, no duplicates === */
-
+ /* === C&O: Homepage fixed bg — force full-bleed, no duplicates === */
+body.home-hero { 
+  background: none !important;  /* kill any other body background */
+}
 
 body.home-hero 
 
 
-/* === C&O: HARD OVERRIDES â€” enforce single fixed hero background === */
+/* === C&O: HARD OVERRIDES — enforce single fixed hero background === */
 html, body, #root {
   background: none !important;
 }
@@ -121,7 +123,14 @@ body.home-hero main * {
 }
   
 /* === Canonical homepage fixed background (single source of truth) === */
-body.home-hero 
+body.home-hero #home-fixed-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  transform: translateZ(0);
+  will-change: opacity;
+  background: url('/cappuccino-crew.png') center 20% / cover no-repeat !important;}
 
 /* Clear *all* other backgrounds on home, including pseudo-elements */
 body.home-hero, body.home-hero #root, body.home-hero .App,
@@ -135,44 +144,3 @@ body.home-hero *, body.home-hero *::before, body.home-hero *::after {
 }
 /* Keep page content visually transparent on home */
 body.home-hero main, body.home-hero main * { background: transparent !important; }
-
- /* === Canonical homepage fixed background === */
- body.home-hero #home-fixed-bg {
-   position: fixed;
-   inset: 0;
-   z-index: -1;
-   pointer-events: none;
-   transform: translateZ(0);
-   will-change: opacity;
-   background: url('/cappuccino-crew_2560x1440.webp') center 20% / cover no-repeat !important;
- }
-
- /* Size-aware lighter images (keep the same focal) */
- @media (max-width: 1024px) {
-   body.home-hero #home-fixed-bg {
-     background-image: url('/cappuccino-crew_1920x1080.webp') !important;
-   }
- }
- @media (max-width: 640px) {
-   body.home-hero #home-fixed-bg {
-     background-image: url('/cappuccino-crew_1280x720.webp') !important;
-   }
- }
-
-/* === FORCE single centered homepage background (wins over any shorthand/!important) === */
-body.home-hero {
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-color: #000 !important;
-  background-image: url('/cappuccino-crew.png') !important;
-  background-repeat: no-repeat !important;
-  background-position: center calc(50% + 64px) !important;
-  background-attachment: fixed !important;
-  background-size: contain !important; /* change to 'cover' for full-bleed */
-}
-
-
-
-

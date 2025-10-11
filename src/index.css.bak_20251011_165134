@@ -1,4 +1,4 @@
-﻿html, body, #root { height: 100%; }
+html, body, #root { height: 100%; }
 /* replaced: body.home-hero background */
 body.home-hero main,
 body.home-hero main * {
@@ -34,21 +34,3 @@ input, select, textarea { font-size: 16px; }
 body.home-hero /* removed: fixed bg moved to app-overrides.css */
 @media (max-width: 640px) { body.home-hero /* removed: fixed bg moved to app-overrides.css */ }
 @media (max-width: 1024px) and (min-width: 641px) { body.home-hero /* removed: fixed bg moved to app-overrides.css */ }
-
-/* === FORCE single centered homepage background (wins over any shorthand/!important) === */
-body.home-hero {
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-position: center calc(50% + 64px) !important;
-  background-color: #000 !important;
-  background-image: url('/cappuccino-crew.png') !important;
-  background-repeat: no-repeat !important;
-  background-position: center calc(50% + 64px) !important;
-  background-attachment: fixed !important;
-  background-size: contain !important; /* change to 'cover' for full-bleed */
-}
-
-
-
-

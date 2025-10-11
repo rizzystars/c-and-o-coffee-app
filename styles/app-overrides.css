@@ -3,12 +3,7 @@ html, body {
   height: 100%;
 }
 
-body.home-hero {
-  background-image: url('/cappuccino-crew.png') !important;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-}
+
 
 /* Let the art show through on the homepage */
 body.home-hero main,
@@ -33,3 +28,25 @@ header {
   background-image: none !important;
   backdrop-filter: none !important;
 }
+
+/* Global fallback to keep app on black */
+html, body, #root { height: 100%; }
+body { margin: 0; background: #000; }
+
+/* === FORCE single centered homepage background (wins over any shorthand/!important) === */
+body.home-hero {
+  background-position: center calc(50% + 64px) !important;
+  background-position: center calc(50% + 64px) !important;
+  background-position: center calc(50% + 64px) !important;
+  background-position: center calc(50% + 64px) !important;
+  background-color: #000 !important;
+  background-image: url('/cappuccino-crew.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center calc(50% + 64px) !important;
+  background-attachment: fixed !important;
+  background-size: contain !important; /* change to 'cover' for full-bleed */
+}
+
+
+
+

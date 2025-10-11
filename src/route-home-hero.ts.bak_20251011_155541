@@ -1,4 +1,4 @@
-function isHome(): boolean {
+﻿function isHome(): boolean {
   return location.hash === '' || location.hash === '#/' || location.hash === '#';
 }
 
@@ -21,7 +21,7 @@ function restoreBodyBg() {
   document.body.style.removeProperty('background-image');
 }
 
-const DESIRED_BG = "url('/cappuccino-crew_2560x1440.webp') center 20% / cover no-repeat";
+const DESIRED_BG = "url('/cappuccino-crew_2560.webp') center 20% / cover no-repeat";
 
 function styleFixedBg() {
   const el = document.getElementById('home-fixed-bg') as HTMLElement | null;

@@ -4,23 +4,28 @@ import { Link } from 'react-router-dom';
 const HomePage: React.FC = () => {
   return (
     <div className="text-white">
-            {/* Top banner (uses global fixed background) */}
-      <section className="relative w-full h-[26vh] flex items-start justify-center pt-16">
+      {/* Top banner (uses global fixed background) */}
+      <section className="relative w-full h-[26vh] flex items-start justify-center pt-8">
         <div className="absolute inset-0 bg-black/30"></div>
-        <div className="relative z-10 text-center">
-          <Link to="/menu" className="inline-block rounded-full bg-blue-600 hover:bg-blue-700 transition px-8 py-3 text-base font-semibold shadow-lg">
-            Order
-          </Link>
+        <div className="relative z-20 text-center space-y-3 -translate-y-2 md:-translate-y-3">
+          <h2 className="font-serif text-4xl md:text-5xl drop-shadow">
+            <span
+              className="inline-block text-white px-4 py-1 rounded-xl shadow-lg"
+              style={{ backgroundColor: '#4169E1', opacity: 1 }}
+            >
+              Coffee
+            </span>
+          </h2>
+          <p className="text-base md:text-lg leading-relaxed">
+            <span
+              className="inline-block text-white px-4 py-3 rounded-xl shadow-md"
+              style={{ backgroundColor: '#4169E1', opacity: 1 }}
+            >
+              Everything from bold drip coffee, silky cappuccinos, and seasonal
+              specials—all crafted with care and quality beans.
+            </span>
+          </p>
         </div>
-      </section>
-
-      {/* Coffee section */}
-      <section className="relative z-10 max-w-3xl mx-auto px-6 text-center">
-        <h2 className="font-serif text-4xl md:text-5xl mb-4 drop-shadow">Coffee</h2>
-        <p className="text-lg md:text-xl leading-relaxed text-white/90">
-          Everything from bold drip coffee, silky cappuccinos, creamy breves, and refreshing cold brew,
-          to espresso shots, flat whites, americanos, mochas, and seasonal specials—all crafted with care and quality beans.
-        </p>
       </section>
 
       {/* Clickable cup image */}
