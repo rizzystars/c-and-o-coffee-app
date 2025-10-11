@@ -1,4 +1,6 @@
-﻿import './route-home-hero';
+﻿initHomeHeroRouteListener();
+import { initHomeHeroRouteListener } from '../route-home-hero';
+import './route-home-hero';
 import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -19,5 +21,6 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
 
 
