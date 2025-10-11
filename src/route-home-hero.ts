@@ -2,6 +2,14 @@
   return location.hash === '' || location.hash === '#/' || location.hash === '#';
 }
 
+function clearBodyBg() {
+  const props = ["background","background-image"];
+  for (const p of props) document.body.style.setProperty(p, "none", "important");
+}
+function restoreBodyBg() {
+  document.body.style.removeProperty("background");
+  document.body.style.removeProperty("background-image");
+}
 function apply() {
   if (isHome()) document.body.classList.add('home-hero');
   else document.body.classList.remove('home-hero');
@@ -22,3 +30,4 @@ export function initHomeHeroRouteListener() {
   window.addEventListener('hashchange', apply);
   window.addEventListener('popstate', apply);
 }
+
