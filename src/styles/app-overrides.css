@@ -115,3 +115,26 @@ body.home-hero #home-fixed-bg {
   will-change: opacity;
 }
 
+
+/* === C&O: HARD OVERRIDES — enforce single fixed hero background === */
+html, body, #root {
+  background: none !important;
+}
+
+body.home-hero main,
+body.home-hero .App,
+body.home-hero .page,
+body.home-hero .wrapper {
+  background: none !important;
+}
+
+/* highest specificity fixed background */
+html body.home-hero #home-fixed-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url('/cappuccino-crew_2560.webp') center 20% / cover no-repeat !important;
+  transform: translateZ(0);
+}
+
