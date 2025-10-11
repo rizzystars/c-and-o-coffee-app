@@ -37,3 +37,18 @@ body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
 header { background-color: #000 !important; background-image: none !important; backdrop-filter: none !important; }
 body.home-hero main, body.home-hero main * { background: transparent !important; }
 @media (prefers-reduced-data: reduce) { #home-fixed-bg { background-image: none; background-color: #000; } }
+
+/* --- Mobile base --- */
+html, body { height: 100%; -webkit-text-size-adjust: 100%; }
+* { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+body { margin: 0; background:#000; color:#fff; }
+:root { --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px); }
+header { padding-top: calc(8px + var(--safe-top)); }
+main { padding-bottom: calc(12px + var(--safe-bottom)); }
+button, .btn, .nav-link, .icon-btn { min-height: 44px; min-width: 44px; }
+input, select, textarea { font-size: 16px; }
+.scroller { -webkit-overflow-scrolling: touch; overflow-y: auto; }
+#home-fixed-bg { position: fixed; inset: 0; background: url('/cappuccino-crew.png') center/cover no-repeat; z-index:-1; pointer-events:none; visibility:hidden; opacity:0; transition:opacity .25s ease; transform: translateZ(0); will-change: opacity; }
+body.home-hero #home-fixed-bg { visibility: visible; opacity: 1; }
+@media (max-width: 640px) { body.home-hero #home-fixed-bg { background-image: url('/cappuccino-crew@1280.webp'), url('/cappuccino-crew@1280.jpg'); background-position: center 40%; } }
+@media (max-width: 1024px) and (min-width: 641px) { body.home-hero #home-fixed-bg { background-image: url('/cappuccino-crew@1920.webp'), url('/cappuccino-crew@1920.jpg'); } }
