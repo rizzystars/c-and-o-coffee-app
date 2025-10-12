@@ -1,0 +1,25 @@
+﻿
+
+/* === BEGIN AUTH_MOBILE_POLISH === */
+body.auth-page { background:#000 !important; background-image:none !important; }
+body.auth-page main {
+  min-height:100dvh; padding-top:calc(24px + env(safe-area-inset-top));
+  padding-bottom:calc(24px + env(safe-area-inset-bottom)); padding-left:16px; padding-right:16px;
+  display:block; margin:0 auto; max-width:480px;
+}
+body.auth-page h1, body.auth-page h2, body.auth-page h3 { color:#fff !important; text-align:center; margin:8px 0 16px; }
+body.auth-page input[type="text"], body.auth-page input[type="email"], body.auth-page input[type="password"], body.auth-page input[type="tel"] {
+  width:100%; font-size:16px; line-height:1.3; padding:14px 14px; color:#fff;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:12px; outline:none; box-sizing:border-box;
+}
+body.auth-page input:focus { border-color:#d4af37; box-shadow:0 0 0 3px rgba(212,175,55,0.25); }
+body.auth-page label { display:block; color:#d9d9d9; font-size:14px; margin:12px 0 6px; }
+body.auth-page button[type="submit"], body.auth-page .btn-primary {
+  width:100%; margin-top:16px; padding:16px; border-radius:12px; font-weight:700; font-size:16px; color:#0a0a0a; background:#d4af37; border:none;
+}
+body.auth-page a { color:#d4af37; text-decoration:underline; }
+body.auth-page .auth-hero, body.auth-page .promo-hero, body.auth-page [class*="hero"] { display:none !important; }
+* { -webkit-tap-highlight-color: transparent; }
+:root { --nav-height:64px; } @media (max-width:430px){ :root{ --nav-height:72px; } }
+/* === END AUTH_MOBILE_POLISH === */
+
