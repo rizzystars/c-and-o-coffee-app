@@ -23,3 +23,39 @@ body.auth-page .auth-hero, body.auth-page .promo-hero, body.auth-page [class*="h
 :root { --nav-height:64px; } @media (max-width:430px){ :root{ --nav-height:72px; } }
 /* === END AUTH_MOBILE_POLISH === */
 
+/* === BEGIN AUTH_CARD_POLISH === */
+body.auth-page main {
+  max-width: 480px;
+}
+body.auth-page form {
+  display: grid;
+  gap: 10px;
+  margin: 8px auto 0;
+  padding: 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+}
+body.auth-page h1 {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+body.auth-page label {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+body.auth-page button[type="submit"] {
+  margin-top: 12px;
+}
+/* Keep footer links tidy if present */
+body.auth-page .auth-foot, body.auth-page .form-footer, body.auth-page .form-links {
+  margin-top: 12px;
+  text-align: center;
+  color: #cfcfcf;
+  font-size: 14px;
+}
+/* === END AUTH_CARD_POLISH === */
+
