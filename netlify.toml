@@ -8,6 +8,33 @@
   # Optional: keep or remove; either is fine with esbuild bundling.
   external_node_modules = ["@supabase/supabase-js"]
 
+# -------------------------------------------------------------------
+# Basic Auth for the whole site (except the webhook path)
+# Replace the user:pass below with your real credentials.
+# If you don't want any site-wide auth, delete this first headers block.
+# -------------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Protect everything by default:
+    Basic-Auth = "youruser:yourpass"
+
+# -------------------------------------------------------------------
+# EXEMPT the Square webhook so Square can POST without auth
+# Specific > general, so this clears Basic-Auth for the function path.
+# -------------------------------------------------------------------
+[[headers]]
+  for = "/.netlify/functions/square-webhook"
+  [headers.values]
+    Basic-Auth = ""
+
+# (Optional) also exempt any other incoming-webhook endpoints you have:
+# [[headers]]
+#   for = "/.netlify/functions/another-webhook"
+#   [headers.values]
+#     Basic-Auth = ""
+
+# SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
